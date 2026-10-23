@@ -71,3 +71,36 @@ def test_candidates_ignore_unnamed_features() -> None:
     assert len(candidates) == 1
     assert candidates[0].name == "Azaiba Beach Park"
     assert candidates[0].terrain_type == "urban park"
+
+
+def test_candidates_keep_constraint_tags() -> None:
+    candidates = _candidates_from_elements(
+        23.5791,
+        58.4026,
+        [
+            {
+                "type": "node",
+                "id": 3,
+                "lat": 23.58,
+                "lon": 58.41,
+                "tags": {
+                    "name": "Old Fort Museum",
+                    "tourism": "attraction",
+                    "fee": "2 OMR",
+                    "opening_hours": "Sa-Th 09:00-17:00",
+                    "wheelchair": "limited",
+                },
+            },
+            {
+                "type": "node",
+                "id": 4,
+                "lat": 23.59,
+                "lon": 58.42,
+                "tags": {"name": "Harbor Viewpoint", "tourism": "viewpoint", "fee": "no", "wheelchair": "unknown"},
+            },
+        ],
+    )
+
+    museum, viewpoint = candidates
+    assert (museum.fee, museum.opening_hours, museum.wheelchair) == (True, "Sa-Th 09:00-17:00", "limited")
+    assert (viewpoint.fee, viewpoint.opening_hours, viewpoint.wheelchair) == (False, None, None)

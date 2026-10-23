@@ -123,6 +123,10 @@ class LocationCandidate:
     osm_id: int
     image_url: Optional[str]
     image_attribution: Optional[str]
+    # Raw OSM facts for travel-style hard constraints. None means untagged.
+    fee: Optional[bool] = None
+    opening_hours: Optional[str] = None
+    wheelchair: Optional[str] = None
 
 
 def _tags_for_intent(intent: str) -> list[tuple[str, str]]:
@@ -267,6 +271,31 @@ def _permit_info(tags: dict) -> tuple[bool, Optional[str]]:
     return False, None
 
 
+def _fee(tags: dict) -> Optional[bool]:
+    """True for fee=yes or an amount, False for fee=no, None when untagged or conditional."""
+    value = tags.get("fee")
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip().lower()
+    if normalized == "no":
+        return False
+    if normalized == "yes" or any(character.isdigit() for character in normalized):
+        return True
+    return None
+
+
+def _opening_hours(tags: dict) -> Optional[str]:
+    value = tags.get("opening_hours")
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return None
+
+
+def _wheelchair(tags: dict) -> Optional[str]:
+    value = tags.get("wheelchair")
+    return value if value in ("yes", "limited", "no") else None
+
+
 def _crowd_level(tags: dict) -> CrowdLevel:
     """Best-effort popularity heuristic from OSM notability tags.
 
@@ -372,6 +401,9 @@ def _candidate_from_element(origin_lat: float, origin_lng: float, element: dict)
         osm_id=element.get("id", 0),
         image_url=image_url,
         image_attribution=image_attribution,
+        fee=_fee(tags_dict),
+        opening_hours=_opening_hours(tags_dict),
+        wheelchair=_wheelchair(tags_dict),
     )
 
 
