@@ -1,12 +1,13 @@
 """Unit tests for server.services.ranking."""
 
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 
 import pytest
 
 from server.services.golden_hour import TimeWindow
 from server.services.locations import LocationCandidate
-from server.services.ranking import WindowContext, rank_places
+from server.services.ranking import Bucket, WindowContext, rank_buckets, rank_places
 from server.services.scorer import CrowdLevel, LightPhase, ShotType, WeatherSnapshot, WindowLightContext
 
 _START = datetime(2026, 10, 23, 13, 0, tzinfo=timezone.utc)
@@ -69,3 +70,29 @@ def test_places_sort_by_score_and_ties_keep_input_order() -> None:
 def test_rank_places_requires_a_window() -> None:
     with pytest.raises(ValueError):
         rank_places([_candidate("Harbor Viewpoint")], [], ShotType.LANDSCAPE)
+
+
+def test_buckets_only_appear_when_tags_support_them() -> None:
+    contexts = [_context(LightPhase.GOLDEN_HOUR, 0)]
+    untagged = rank_places([_candidate("Quiet Cove")], contexts, ShotType.LANDSCAPE)
+
+    assert rank_buckets(untagged) == {Bucket.BEST_OVERALL: untagged[0]}
+    assert rank_buckets([]) == {}
+
+
+def test_buckets_pick_the_highest_ranked_qualifying_place() -> None:
+    contexts = [_context(LightPhase.GOLDEN_HOUR, 0)]
+    candidates = [
+        _candidate("Quiet Cove"),
+        replace(_candidate("Covered Market", crowd_level=CrowdLevel.HIGH), indoor=True),
+        replace(_candidate("Free Park", crowd_level=CrowdLevel.MEDIUM), fee=False),
+        replace(_candidate("Free Plaza", crowd_level=CrowdLevel.HIGH), fee=False, indoor=True),
+    ]
+
+    buckets = rank_buckets(rank_places(candidates, contexts, ShotType.LANDSCAPE))
+
+    assert {bucket: place.candidate.name for bucket, place in buckets.items()} == {
+        Bucket.BEST_OVERALL: "Quiet Cove",
+        Bucket.FREE: "Free Park",
+        Bucket.RAINY_DAY: "Covered Market",
+    }

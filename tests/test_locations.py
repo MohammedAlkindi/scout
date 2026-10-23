@@ -89,6 +89,7 @@ def test_candidates_keep_constraint_tags() -> None:
                     "fee": "2 OMR",
                     "opening_hours": "Sa-Th 09:00-17:00",
                     "wheelchair": "limited",
+                    "indoor": "yes",
                 },
             },
             {
@@ -104,3 +105,5 @@ def test_candidates_keep_constraint_tags() -> None:
     museum, viewpoint = candidates
     assert (museum.fee, museum.opening_hours, museum.wheelchair) == (True, "Sa-Th 09:00-17:00", "limited")
     assert (viewpoint.fee, viewpoint.opening_hours, viewpoint.wheelchair) == (False, None, None)
+    assert museum.indoor is True
+    assert viewpoint.indoor is False

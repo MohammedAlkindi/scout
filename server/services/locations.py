@@ -127,6 +127,8 @@ class LocationCandidate:
     fee: Optional[bool] = None
     opening_hours: Optional[str] = None
     wheelchair: Optional[str] = None
+    # indoor=yes or covered=yes: an option when it rains.
+    indoor: bool = False
 
 
 def _tags_for_intent(intent: str) -> list[tuple[str, str]]:
@@ -296,6 +298,10 @@ def _wheelchair(tags: dict) -> Optional[str]:
     return value if value in ("yes", "limited", "no") else None
 
 
+def _indoor(tags: dict) -> bool:
+    return tags.get("indoor") == "yes" or tags.get("covered") == "yes"
+
+
 def _crowd_level(tags: dict) -> CrowdLevel:
     """Best-effort popularity heuristic from OSM notability tags.
 
@@ -404,6 +410,7 @@ def _candidate_from_element(origin_lat: float, origin_lng: float, element: dict)
         fee=_fee(tags_dict),
         opening_hours=_opening_hours(tags_dict),
         wheelchair=_wheelchair(tags_dict),
+        indoor=_indoor(tags_dict),
     )
 
 

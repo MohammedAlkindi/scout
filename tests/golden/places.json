@@ -1,0 +1,135 @@
+{
+  "comment": "Fixed Scout inputs for ranking tests. The places are fictional. local_time is a Friday at the places.",
+  "shot_type": "landscape",
+  "local_time": "2026-10-23T18:00:00",
+  "windows": [
+    {
+      "label": "golden_hour_evening",
+      "start_utc": "2026-10-23T13:05:00+00:00",
+      "end_utc": "2026-10-23T13:36:00+00:00",
+      "phase": "golden_hour",
+      "centrality": 1.0,
+      "weather": {
+        "cloud_cover_pct": 30.0,
+        "wind_speed_mph": 12.0,
+        "visibility_miles": 9.0,
+        "precipitation_probability_pct": 20.0,
+        "temperature_f": 84.0
+      }
+    },
+    {
+      "label": "blue_hour_evening",
+      "start_utc": "2026-10-23T13:58:00+00:00",
+      "end_utc": "2026-10-23T14:20:00+00:00",
+      "phase": "blue_hour",
+      "centrality": 1.0,
+      "weather": {
+        "cloud_cover_pct": 25.0,
+        "wind_speed_mph": 4.0,
+        "visibility_miles": 10.0,
+        "precipitation_probability_pct": 5.0,
+        "temperature_f": 80.0
+      }
+    }
+  ],
+  "places": [
+    {
+      "name": "Harbor Viewpoint",
+      "distance_miles": 0.6,
+      "terrain_type": "scenic viewpoint",
+      "accessibility_notes": "wheelchair accessible",
+      "accessibility_difficulty": 0.05,
+      "permit_required": false,
+      "permit_notes": null,
+      "crowd_level": "medium",
+      "fee": false,
+      "opening_hours": null,
+      "wheelchair": "yes",
+      "indoor": false
+    },
+    {
+      "name": "Old Fort Museum",
+      "distance_miles": 1.2,
+      "terrain_type": "landmark",
+      "accessibility_notes": "limited wheelchair accessibility",
+      "accessibility_difficulty": 0.4,
+      "permit_required": true,
+      "permit_notes": "a fee is charged at this location per OSM data",
+      "crowd_level": "medium",
+      "fee": true,
+      "opening_hours": "Sa-Th 09:00-17:00",
+      "wheelchair": "limited",
+      "indoor": true
+    },
+    {
+      "name": "Corniche Promenade",
+      "distance_miles": 2.3,
+      "terrain_type": "waterfront",
+      "accessibility_notes": "wheelchair accessible; surface: paved",
+      "accessibility_difficulty": 0.05,
+      "permit_required": false,
+      "permit_notes": null,
+      "crowd_level": "medium",
+      "fee": null,
+      "opening_hours": null,
+      "wheelchair": "yes",
+      "indoor": false
+    },
+    {
+      "name": "Ridge Summit",
+      "distance_miles": 6.5,
+      "terrain_type": "mountain summit",
+      "accessibility_notes": "accessibility unknown -- verify locally",
+      "accessibility_difficulty": 0.6,
+      "permit_required": false,
+      "permit_notes": null,
+      "crowd_level": "low",
+      "fee": null,
+      "opening_hours": null,
+      "wheelchair": null,
+      "indoor": false
+    },
+    {
+      "name": "Covered Souq",
+      "distance_miles": 0.9,
+      "terrain_type": "landmark",
+      "accessibility_notes": "not wheelchair accessible",
+      "accessibility_difficulty": 0.7,
+      "permit_required": false,
+      "permit_notes": null,
+      "crowd_level": "high",
+      "fee": false,
+      "opening_hours": "Sa-Th 09:00-13:00,16:00-21:00; Fr 16:00-21:00",
+      "wheelchair": "no",
+      "indoor": true
+    },
+    {
+      "name": "Garden Park",
+      "distance_miles": 1.4,
+      "terrain_type": "urban park",
+      "accessibility_notes": "wheelchair accessible",
+      "accessibility_difficulty": 0.05,
+      "permit_required": false,
+      "permit_notes": null,
+      "crowd_level": "low",
+      "fee": false,
+      "opening_hours": "Mo-Su 06:00-22:00",
+      "wheelchair": "yes",
+      "indoor": false
+    },
+    {
+      "name": "Beach Club",
+      "distance_miles": 3.1,
+      "terrain_type": "beach",
+      "accessibility_notes": "accessibility unknown -- verify locally",
+      "accessibility_difficulty": 0.25,
+      "permit_required": true,
+      "permit_notes": "a fee is charged at this location per OSM data",
+      "crowd_level": "medium",
+      "fee": true,
+      "opening_hours": "Mo-Su 08:00-18:00",
+      "wheelchair": null,
+      "indoor": false
+    }
+  ]
+}

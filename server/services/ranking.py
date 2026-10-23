@@ -8,6 +8,7 @@ reproduced from fixed fixtures.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 from typing import Optional
 
 from server.services.golden_hour import TimeWindow
@@ -79,3 +80,30 @@ def rank_places(
 
     ranked.sort(key=lambda place: place.result.score, reverse=True)
     return ranked
+
+
+class Bucket(str, Enum):
+    """Named picks from a ranking, ported from OptiRoute's recommendation buckets.
+
+    There is no best-light bucket: the light score depends only on the time
+    window, and every place shares the same windows and origin weather, so
+    it cannot single out a place.
+    """
+
+    BEST_OVERALL = "best_overall"
+    FREE = "free"
+    RAINY_DAY = "rainy_day"
+
+
+def rank_buckets(ranked: list[RankedPlace]) -> dict[Bucket, RankedPlace]:
+    """The highest-ranked place for each bucket the data supports.
+
+    `free` needs an OSM fee=no tag and `rainy_day` needs indoor=yes or
+    covered=yes. A bucket with no qualifying place is left out.
+    """
+    picks = {
+        Bucket.BEST_OVERALL: next(iter(ranked), None),
+        Bucket.FREE: next((place for place in ranked if place.candidate.fee is False), None),
+        Bucket.RAINY_DAY: next((place for place in ranked if place.candidate.indoor), None),
+    }
+    return {bucket: place for bucket, place in picks.items() if place is not None}
