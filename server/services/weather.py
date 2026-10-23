@@ -88,14 +88,19 @@ def _parse_conditions(data: dict) -> ConditionsResult:
     return ConditionsResult(current=current, forecast_24h=forecast)
 
 
+def _parse_utc_offset(data: dict) -> int:
+    try:
+        return int(data["utc_offset_seconds"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise UpstreamServiceError("Weather data is temporarily unavailable.") from exc
+
+
 async def fetch_conditions(lat: float, lng: float) -> ConditionsResult:
     """Fetch current conditions and a 24h hourly forecast for a location.
 
     Raises UpstreamServiceError on any network failure, timeout, or
     unexpected response shape -- callers never see raw httpx exceptions.
     """
-    await _rate_limiter.acquire()
-
     params = {
         "latitude": lat,
         "longitude": lng,
@@ -106,6 +111,23 @@ async def fetch_conditions(lat: float, lng: float) -> ConditionsResult:
         "wind_speed_unit": "mph",
         "timezone": "UTC",
     }
+    return _parse_conditions(await _fetch_open_meteo(params))
+
+
+async def fetch_utc_offset_seconds(lat: float, lng: float) -> int:
+    """Current UTC offset of the location's time zone, in seconds.
+
+    With timezone=auto Open-Meteo resolves the time zone from the
+    coordinates and reports utc_offset_seconds, even when no weather
+    variables are requested. Raises UpstreamServiceError like
+    fetch_conditions.
+    """
+    params = {"latitude": lat, "longitude": lng, "timezone": "auto", "forecast_days": 1}
+    return _parse_utc_offset(await _fetch_open_meteo(params))
+
+
+async def _fetch_open_meteo(params: dict[str, object]) -> dict:
+    await _rate_limiter.acquire()
 
     started = perf_counter()
     try:
@@ -129,4 +151,6 @@ async def fetch_conditions(lat: float, lng: float) -> ConditionsResult:
         record_upstream_call("open_meteo", "error", round((perf_counter() - started) * 1000))
         raise UpstreamServiceError("Weather data is temporarily unavailable.") from exc
 
-    return _parse_conditions(data)
+    if not isinstance(data, dict):
+        raise UpstreamServiceError("Weather data is temporarily unavailable.")
+    return data
