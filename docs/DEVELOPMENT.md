@@ -6,7 +6,7 @@ This guide covers the local workflow for Scout.
 
 ```bash
 python -m venv .venv
-.venv\Scripts\activate
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
 npm install

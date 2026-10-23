@@ -8,7 +8,7 @@ photo or outdoor planning.
 
 ```bash
 python -m venv .venv
-.venv\Scripts\activate
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
 python -m server.mcp_server
@@ -37,7 +37,7 @@ Add a local MCP server entry that runs Scout from this repository:
     "scout": {
       "command": "python",
       "args": ["-m", "server.mcp_server"],
-      "cwd": "C:\\Users\\alkin\\Github\\Scout"
+      "cwd": "/path/to/scout"
     }
   }
 }
@@ -50,13 +50,16 @@ activated environment:
 {
   "mcpServers": {
     "scout": {
-      "command": "C:\\Users\\alkin\\Github\\Scout\\.venv\\Scripts\\python.exe",
+      "command": "/path/to/scout/.venv/bin/python",
       "args": ["-m", "server.mcp_server"],
-      "cwd": "C:\\Users\\alkin\\Github\\Scout"
+      "cwd": "/path/to/scout"
     }
   }
 }
 ```
+
+On Windows the interpreter is `.venv\Scripts\python.exe`, and JSON paths need
+escaped backslashes, for example `"C:\\src\\scout\\.venv\\Scripts\\python.exe"`.
 
 ## Example Prompts
 
