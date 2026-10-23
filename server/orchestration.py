@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import logging
 import math
-from dataclasses import dataclass
 from datetime import date as date_type, datetime, timedelta, timezone
 from typing import Optional
 
@@ -44,6 +43,7 @@ from server.services import locations as locations_service
 from server.services import weather as weather_service
 from server.services.golden_hour import GoldenHourResult, SolarEvent, TimeWindow as GHTimeWindow, classify_window
 from server.services.locations import LocationCandidate
+from server.services.ranking import RankedPlace, WindowContext, rank_places
 from server.services.scorer import (
     CrowdLevel,
     LightPhase,
@@ -305,6 +305,11 @@ _DEMO_SOURCE_NOTE = (
     "Live providers were unavailable, so Scout loaded its bundled Muscat demo plan with static places and "
     "freshly calculated light windows."
 )
+_DEMO_CAVEATS = (
+    "Demo fallback used bundled Muscat place data because live providers were unavailable.",
+    "Crowd and access signals are estimates; verify locally before leaving.",
+    "No verified place photo was found in OSM or Wikimedia metadata.",
+)
 
 
 def _distance_miles(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
@@ -416,13 +421,33 @@ def _recommendation_caveats(candidate: LocationCandidate, weather: WeatherSnapsh
     return caveats[:4]
 
 
-@dataclass
-class _RankedLocation:
-    candidate: LocationCandidate
-    window: GHTimeWindow
-    light: WindowLightContext
-    weather: WeatherSnapshot
-    result: ScoreResult
+def _recommendation_item(rank: int, place: RankedPlace, caveats: list[str]) -> RecommendationItem:
+    return RecommendationItem(
+        rank=rank,
+        location_name=place.candidate.name,
+        latitude=place.candidate.latitude,
+        longitude=place.candidate.longitude,
+        distance_miles=place.candidate.distance_miles,
+        terrain_type=place.candidate.terrain_type,
+        best_window=TimeWindowSchema(start_utc=place.window.start, end_utc=place.window.end),
+        light_phase=place.light.phase,
+        score=place.result.score,
+        score_breakdown=ScoreBreakdownSchema(
+            light=place.result.breakdown.light,
+            weather=place.result.breakdown.weather,
+            crowd=place.result.breakdown.crowd,
+            access=place.result.breakdown.access,
+        ),
+        confidence=_recommendation_confidence(place.candidate, place.weather, place.result),
+        reason_tags=_reason_tags(place.candidate, place.light, place.weather, place.result),
+        caveats=caveats,
+        conditions_summary=_conditions_summary(place.weather),
+        advice=place.result.explanation,
+        permit_required=place.candidate.permit_required,
+        permit_notes=place.candidate.permit_notes,
+        image_url=place.candidate.image_url,
+        image_attribution=place.candidate.image_attribution,
+    )
 
 
 def _demo_candidates(origin_latitude: float, origin_longitude: float) -> list[LocationCandidate]:
@@ -478,53 +503,14 @@ def _build_demo_recommendation(
         temperature_f=84.0,
     )
 
-    ranked: list[_RankedLocation] = []
-    for candidate in _demo_candidates(latitude, longitude):
-        location = LocationConditions(
-            name=candidate.name,
-            crowd_level=candidate.crowd_level,
-            permit_required=candidate.permit_required,
-            accessibility_difficulty=candidate.accessibility_difficulty,
-            distance_miles=candidate.distance_miles,
-        )
-        result = compute_score(location, light, weather, resolved_shot_type)
-        ranked.append(
-            _RankedLocation(candidate=candidate, window=window, light=light, weather=weather, result=result)
-        )
-
-    ranked.sort(key=lambda item: item.result.score, reverse=True)
+    ranked = rank_places(
+        _demo_candidates(latitude, longitude),
+        [WindowContext(window=window, light=light, weather=weather)],
+        resolved_shot_type,
+    )
     items = [
-        RecommendationItem(
-            rank=rank,
-            location_name=item.candidate.name,
-            latitude=item.candidate.latitude,
-            longitude=item.candidate.longitude,
-            distance_miles=item.candidate.distance_miles,
-            terrain_type=item.candidate.terrain_type,
-            best_window=TimeWindowSchema(start_utc=item.window.start, end_utc=item.window.end),
-            light_phase=item.light.phase,
-            score=item.result.score,
-            score_breakdown=ScoreBreakdownSchema(
-                light=item.result.breakdown.light,
-                weather=item.result.breakdown.weather,
-                crowd=item.result.breakdown.crowd,
-                access=item.result.breakdown.access,
-            ),
-            confidence=_recommendation_confidence(item.candidate, item.weather, item.result),
-            reason_tags=_reason_tags(item.candidate, item.light, item.weather, item.result),
-            caveats=[
-                "Demo fallback used bundled Muscat place data because live providers were unavailable.",
-                "Crowd and access signals are estimates; verify locally before leaving.",
-                "No verified place photo was found in OSM or Wikimedia metadata.",
-            ],
-            conditions_summary=_conditions_summary(item.weather),
-            advice=item.result.explanation,
-            permit_required=item.candidate.permit_required,
-            permit_notes=item.candidate.permit_notes,
-            image_url=item.candidate.image_url,
-            image_attribution=item.candidate.image_attribution,
-        )
-        for rank, item in enumerate(ranked[:MAX_RECOMMENDATIONS], start=1)
+        _recommendation_item(rank, place, list(_DEMO_CAVEATS))
+        for rank, place in enumerate(ranked[:MAX_RECOMMENDATIONS], start=1)
     ]
 
     return RecommendationResponse(
@@ -576,58 +562,18 @@ async def build_recommendation(
         raise UpstreamServiceError("Could not determine an upcoming shoot window for this location.")
 
     window_contexts = [
-        (window, light, _weather_snapshot_from_conditions(conditions, window.start + (window.end - window.start) / 2))
+        WindowContext(
+            window=window,
+            light=light,
+            weather=_weather_snapshot_from_conditions(conditions, window.start + (window.end - window.start) / 2),
+        )
         for window, light in window_light_pairs
     ]
 
-    ranked: list[_RankedLocation] = []
-    for candidate in candidates:
-        location = LocationConditions(
-            name=candidate.name,
-            crowd_level=candidate.crowd_level,
-            permit_required=candidate.permit_required,
-            accessibility_difficulty=candidate.accessibility_difficulty,
-            distance_miles=candidate.distance_miles,
-        )
-        best: Optional[_RankedLocation] = None
-        for window, light, weather in window_contexts:
-            result = compute_score(location, light, weather, resolved_shot_type)
-            if best is None or result.score > best.result.score:
-                best = _RankedLocation(candidate=candidate, window=window, light=light, weather=weather, result=result)
-        assert best is not None  # window_contexts is non-empty, guaranteed above
-        ranked.append(best)
-
-    ranked.sort(key=lambda item: item.result.score, reverse=True)
-    top = ranked[:MAX_RECOMMENDATIONS]
-
+    ranked = rank_places(candidates, window_contexts, resolved_shot_type)
     items = [
-        RecommendationItem(
-            rank=rank,
-            location_name=item.candidate.name,
-            latitude=item.candidate.latitude,
-            longitude=item.candidate.longitude,
-            distance_miles=item.candidate.distance_miles,
-            terrain_type=item.candidate.terrain_type,
-            best_window=TimeWindowSchema(start_utc=item.window.start, end_utc=item.window.end),
-            light_phase=item.light.phase,
-            score=item.result.score,
-            score_breakdown=ScoreBreakdownSchema(
-                light=item.result.breakdown.light,
-                weather=item.result.breakdown.weather,
-                crowd=item.result.breakdown.crowd,
-                access=item.result.breakdown.access,
-            ),
-            confidence=_recommendation_confidence(item.candidate, item.weather, item.result),
-            reason_tags=_reason_tags(item.candidate, item.light, item.weather, item.result),
-            caveats=_recommendation_caveats(item.candidate, item.weather),
-            conditions_summary=_conditions_summary(item.weather),
-            advice=item.result.explanation,
-            permit_required=item.candidate.permit_required,
-            permit_notes=item.candidate.permit_notes,
-            image_url=item.candidate.image_url,
-            image_attribution=item.candidate.image_attribution,
-        )
-        for rank, item in enumerate(top, start=1)
+        _recommendation_item(rank, place, _recommendation_caveats(place.candidate, place.weather))
+        for rank, place in enumerate(ranked[:MAX_RECOMMENDATIONS], start=1)
     ]
 
     return RecommendationResponse(
