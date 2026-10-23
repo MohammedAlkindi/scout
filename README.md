@@ -224,10 +224,9 @@ requests.
 
 ## Product Status
 
-Scout is a polished prototype moving toward production readiness. The core
-technical shape is solid: transport layers are thin, scoring is deterministic,
-external API concerns are isolated, CI is in place, and the frontend is
-TypeScript-first.
+Scout is a prototype. The transport layers are thin, scoring is deterministic,
+external API calls are isolated in `server/services/`, CI runs on pushes and
+pull requests, and the frontend is strict TypeScript.
 
 Remaining maturity steps:
 

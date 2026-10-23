@@ -1,7 +1,7 @@
 # Roadmap
 
-Scout is already a strong technical prototype. The next work should focus on
-trust, polish, and repeatability.
+Scout is a prototype deployed on Vercel. The next work focuses on trust,
+polish, and repeatability.
 
 ## Now
 
