@@ -3,9 +3,11 @@
 import pytest
 
 from server.services.scorer import (
+    DEFAULT_WEIGHTS,
     CrowdLevel,
     LightPhase,
     LocationConditions,
+    ScoreWeights,
     ShotType,
     WeatherSnapshot,
     WindowLightContext,
@@ -205,3 +207,20 @@ def test_breakdown_components_within_bounds() -> None:
     assert 0 <= result.breakdown.weather <= 100
     assert 0 <= result.breakdown.crowd <= 100
     assert 0 <= result.breakdown.access <= 100
+
+
+def test_default_weights_keep_the_documented_split() -> None:
+    assert DEFAULT_WEIGHTS == ScoreWeights(light=0.35, weather=0.30, crowd=0.20, access=0.15)
+
+
+def test_custom_weights_change_the_blend() -> None:
+    location = make_location(crowd_level=CrowdLevel.HIGH)
+    light = WindowLightContext(phase=LightPhase.GOLDEN_HOUR, centrality=1.0)
+    light_only = ScoreWeights(light=1.0, weather=0.0, crowd=0.0, access=0.0)
+
+    weighted = score_window(location, light, make_weather(), ShotType.LANDSCAPE, light_only)
+    default = score_window(location, light, make_weather(), ShotType.LANDSCAPE)
+
+    assert weighted.score == round(weighted.breakdown.light)
+    assert weighted.breakdown == default.breakdown
+    assert weighted.score > default.score

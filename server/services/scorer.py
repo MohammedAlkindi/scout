@@ -14,8 +14,8 @@ The score is a weighted blend of four components:
                             and distance from the searcher's origin all
                             reduce the score
 
-Weights are module-level constants so the rationale is visible at a glance
-and adjustable without touching the scoring algorithm itself.
+The percentages above are DEFAULT_WEIGHTS. Callers can pass another
+ScoreWeights without touching the scoring algorithm itself.
 """
 
 from __future__ import annotations
@@ -47,10 +47,17 @@ class CrowdLevel(str, Enum):
     HIGH = "high"
 
 
-LIGHT_WEIGHT = 0.35
-WEATHER_WEIGHT = 0.30
-CROWD_WEIGHT = 0.20
-ACCESS_WEIGHT = 0.15
+@dataclass(frozen=True)
+class ScoreWeights:
+    """Relative weight of each score component. The four weights sum to 1."""
+
+    light: float
+    weather: float
+    crowd: float
+    access: float
+
+
+DEFAULT_WEIGHTS = ScoreWeights(light=0.35, weather=0.30, crowd=0.20, access=0.15)
 
 CROWD_SCORE = {
     CrowdLevel.LOW: 100.0,
@@ -225,6 +232,7 @@ def score_window(
     light: WindowLightContext,
     weather: WeatherSnapshot,
     shot_type: ShotType = ShotType.LANDSCAPE,
+    weights: ScoreWeights = DEFAULT_WEIGHTS,
 ) -> ScoreResult:
     """Score a location + time window from 0-100 with a plain-English explanation."""
     light_score = _light_score(light)
@@ -233,10 +241,10 @@ def score_window(
     access_score = _access_score(location)
 
     total = (
-        light_score * LIGHT_WEIGHT
-        + weather_score * WEATHER_WEIGHT
-        + crowd_score * CROWD_WEIGHT
-        + access_score * ACCESS_WEIGHT
+        light_score * weights.light
+        + weather_score * weights.weather
+        + crowd_score * weights.crowd
+        + access_score * weights.access
     )
 
     breakdown = ScoreBreakdown(
