@@ -27,6 +27,7 @@ from server.schemas import (
     ScoreWindowResponse,
 )
 from server.services.scorer import CrowdLevel, ShotType
+from server.services.travel_styles import TravelStyle
 
 mcp = FastMCP(
     "scout",
@@ -141,7 +142,12 @@ async def score_window(
 
 @mcp.tool()
 async def build_recommendation(
-    latitude: float, longitude: float, intent: str, radius_miles: float = 15.0, shot_type: Optional[ShotType] = None
+    latitude: float,
+    longitude: float,
+    intent: str,
+    radius_miles: float = 15.0,
+    shot_type: Optional[ShotType] = None,
+    travel_style: Optional[TravelStyle] = None,
 ) -> RecommendationResponse:
     """Top 3 location + time-window recommendations for a shot or activity, fully reasoned.
 
@@ -151,9 +157,19 @@ async def build_recommendation(
     the best-scoring window for each of the top 3 locations, with a
     conditions summary and one-line advice per location. `shot_type` is
     inferred from `intent` if not given explicitly.
+
+    `travel_style` is optional and defaults to the photographer ranking.
+    Set it to sightseeing, family, budget or accessible to apply that
+    style's score weights and hard constraints (open now, walking distance,
+    free entry, wheelchair access). The response then includes
+    `travel_plan` with the places removed and why, ranking buckets, and an
+    explanation. When narrating it, repeat only the scores and reasons
+    returned, since place facts come from OpenStreetMap tags.
     """
     try:
-        return await orchestration.build_recommendation(latitude, longitude, intent, radius_miles, shot_type)
+        return await orchestration.build_recommendation(
+            latitude, longitude, intent, radius_miles, shot_type, travel_style
+        )
     except ScoutError as exc:
         _reraise_as_tool_error(exc)
         raise

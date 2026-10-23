@@ -19,7 +19,7 @@ from __future__ import annotations
 import logging
 import math
 from datetime import date as date_type, datetime, timedelta, timezone
-from typing import Optional
+from typing import Callable, Optional
 
 from server import config
 from server.cache import TTLCache
@@ -28,14 +28,19 @@ from server.schemas import (
     ConditionsResponse,
     ForecastHourSchema,
     GoldenHourResponse,
+    HardConstraintsSchema,
     LocationCandidateSchema,
     LocationsResponse,
+    RankingBucketSchema,
     RecommendationItem,
     RecommendationResponse,
+    RejectedPlaceSchema,
     ScoreBreakdownSchema,
+    ScoreWeightsSchema,
     ScoreWindowResponse,
     SolarEventSchema,
     TimeWindowSchema,
+    TravelPlanSchema,
     WeatherSnapshotSchema,
 )
 from server.services import golden_hour as golden_hour_service
@@ -54,12 +59,15 @@ from server.services.scorer import (
     WindowLightContext,
 )
 from server.services.scorer import score_window as compute_score
+from server.services.travel_plan import TravelPlan, plan_travel
+from server.services.travel_styles import TRAVEL_STYLE_PROFILES, TravelStyle
 from server.services.weather import ConditionsResult, ForecastHour
 
 logger = logging.getLogger("scout.orchestration")
 
 _conditions_cache: TTLCache[ConditionsResult] = TTLCache()
 _locations_cache: TTLCache[list[LocationCandidate]] = TTLCache()
+_utc_offset_cache: TTLCache[int] = TTLCache()
 
 MAX_RECOMMENDATIONS = 3
 DEFAULT_RADIUS_MILES = 15.0
@@ -450,6 +458,81 @@ def _recommendation_item(rank: int, place: RankedPlace, caveats: list[str]) -> R
     )
 
 
+CaveatsFor = Callable[[RankedPlace], list[str]]
+
+
+def _live_caveats(place: RankedPlace) -> list[str]:
+    return _recommendation_caveats(place.candidate, place.weather)
+
+
+def _demo_caveats(place: RankedPlace) -> list[str]:
+    return list(_DEMO_CAVEATS)
+
+
+async def _local_time(latitude: float, longitude: float, now: datetime) -> Optional[datetime]:
+    """Wall-clock time at the origin, or None when the time zone lookup fails."""
+    key = f"utc_offset:{_round_coord(latitude)}:{_round_coord(longitude)}"
+    try:
+        offset_seconds = await _utc_offset_cache.get_or_fetch(
+            key,
+            config.WEATHER_CACHE_TTL_SECONDS,
+            lambda: weather_service.fetch_utc_offset_seconds(latitude, longitude),
+        )
+    except (RateLimitedError, UpstreamServiceError) as exc:
+        logger.warning("travel_plan_local_time_unavailable reason=%s", type(exc).__name__)
+        return None
+    return (now + timedelta(seconds=offset_seconds)).replace(tzinfo=None)
+
+
+def _travel_plan_schema(plan: TravelPlan, local_time: Optional[datetime], caveats_for: CaveatsFor) -> TravelPlanSchema:
+    weights = plan.profile.weights
+    constraints = plan.profile.constraints
+    return TravelPlanSchema(
+        travel_style=plan.style,
+        weights=ScoreWeightsSchema(
+            light=weights.light, weather=weights.weather, crowd=weights.crowd, access=weights.access
+        ),
+        constraints=HardConstraintsSchema(
+            free_only=constraints.free_only,
+            open_now=constraints.open_now,
+            wheelchair_required=constraints.wheelchair_required,
+            max_walk_miles=constraints.max_walk_miles,
+        ),
+        local_time=local_time,
+        buckets=[
+            RankingBucketSchema(
+                bucket=bucket,
+                recommendation=_recommendation_item(plan.ranked.index(place) + 1, place, caveats_for(place)),
+            )
+            for bucket, place in plan.buckets.items()
+        ],
+        rejected=[
+            RejectedPlaceSchema(
+                location_name=rejected.candidate.name,
+                distance_miles=rejected.candidate.distance_miles,
+                reasons=list(rejected.reasons),
+            )
+            for rejected in plan.rejected
+        ],
+        explanation=plan.explanation,
+    )
+
+
+def _rank_for_style(
+    candidates: list[LocationCandidate],
+    contexts: list[WindowContext],
+    shot_type: ShotType,
+    travel_style: Optional[TravelStyle],
+    local_time: Optional[datetime],
+    caveats_for: CaveatsFor,
+) -> tuple[list[RankedPlace], Optional[TravelPlanSchema]]:
+    """The default ranking without a travel style, otherwise the style's plan."""
+    if travel_style is None:
+        return rank_places(candidates, contexts, shot_type), None
+    plan = plan_travel(candidates, contexts, shot_type, travel_style, local_time)
+    return plan.ranked, _travel_plan_schema(plan, local_time, caveats_for)
+
+
 def _demo_candidates(origin_latitude: float, origin_longitude: float) -> list[LocationCandidate]:
     demo_places: list[tuple[str, float, float, str, CrowdLevel, float]] = [
         ("Azaiba Beach Park", 23.6019, 58.3912, "urban park", CrowdLevel.LOW, 0.15),
@@ -493,6 +576,7 @@ def _build_demo_recommendation(
     intent: str,
     resolved_shot_type: ShotType,
     now: datetime,
+    travel_style: Optional[TravelStyle],
 ) -> RecommendationResponse:
     window, light = _demo_window_context(latitude, longitude, now)
     weather = WeatherSnapshot(
@@ -503,13 +587,17 @@ def _build_demo_recommendation(
         temperature_f=84.0,
     )
 
-    ranked = rank_places(
+    # The bundled places carry no opening hours, so no local time is needed.
+    ranked, travel_plan = _rank_for_style(
         _demo_candidates(latitude, longitude),
         [WindowContext(window=window, light=light, weather=weather)],
         resolved_shot_type,
+        travel_style,
+        None,
+        _demo_caveats,
     )
     items = [
-        _recommendation_item(rank, place, list(_DEMO_CAVEATS))
+        _recommendation_item(rank, place, _demo_caveats(place))
         for rank, place in enumerate(ranked[:MAX_RECOMMENDATIONS], start=1)
     ]
 
@@ -522,6 +610,7 @@ def _build_demo_recommendation(
         recommendations=items,
         demo_mode=True,
         source_note=_DEMO_SOURCE_NOTE,
+        travel_plan=travel_plan,
     )
 
 
@@ -531,8 +620,14 @@ async def build_recommendation(
     intent: str,
     radius_miles: float = DEFAULT_RADIUS_MILES,
     shot_type: Optional[ShotType] = None,
+    travel_style: Optional[TravelStyle] = None,
 ) -> RecommendationResponse:
-    """Orchestrate golden hour + conditions + locations + scoring into top-3 recommendations."""
+    """Orchestrate golden hour + conditions + locations + scoring into top-3 recommendations.
+
+    Without `travel_style` the ranking and response are the photographer
+    default. With it, the style's hard constraints and weights apply and the
+    response carries a `travel_plan`.
+    """
     _validate_latlng(latitude, longitude)
     if not intent or not intent.strip():
         raise InvalidRequestError("intent must describe what you want to shoot or do")
@@ -553,7 +648,7 @@ async def build_recommendation(
                 longitude,
                 type(exc).__name__,
             )
-            return _build_demo_recommendation(latitude, longitude, intent, resolved_shot_type, now)
+            return _build_demo_recommendation(latitude, longitude, intent, resolved_shot_type, now, travel_style)
         raise
 
     window_light_pairs = _upcoming_light_windows(latitude, longitude, now)
@@ -570,9 +665,14 @@ async def build_recommendation(
         for window, light in window_light_pairs
     ]
 
-    ranked = rank_places(candidates, window_contexts, resolved_shot_type)
+    local_time: Optional[datetime] = None
+    if travel_style is not None and TRAVEL_STYLE_PROFILES[travel_style].constraints.open_now:
+        local_time = await _local_time(latitude, longitude, now)
+    ranked, travel_plan = _rank_for_style(
+        candidates, window_contexts, resolved_shot_type, travel_style, local_time, _live_caveats
+    )
     items = [
-        _recommendation_item(rank, place, _recommendation_caveats(place.candidate, place.weather))
+        _recommendation_item(rank, place, _live_caveats(place))
         for rank, place in enumerate(ranked[:MAX_RECOMMENDATIONS], start=1)
     ]
 
@@ -583,4 +683,5 @@ async def build_recommendation(
         shot_type=resolved_shot_type,
         generated_at=now,
         recommendations=items,
+        travel_plan=travel_plan,
     )

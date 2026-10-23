@@ -1,8 +1,8 @@
 """Shared Pydantic request/response schemas for the MCP layer and HTTP layer.
 
 Both server/mcp_server.py and server/api.py import from here so an MCP
-client and a web client see identical typed shapes. Enums are re-exported
-from server.services.scorer rather than duplicated.
+client and a web client see identical typed shapes. Enums are imported
+from the service modules rather than duplicated.
 """
 
 from __future__ import annotations
@@ -12,7 +12,9 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
+from server.services.ranking import Bucket
 from server.services.scorer import CrowdLevel, LightPhase, ShotType
+from server.services.travel_styles import TravelStyle
 
 
 class SolarEventSchema(BaseModel):
@@ -120,6 +122,44 @@ class RecommendationItem(BaseModel):
     image_attribution: Optional[str] = None
 
 
+class ScoreWeightsSchema(BaseModel):
+    light: float
+    weather: float
+    crowd: float
+    access: float
+
+
+class HardConstraintsSchema(BaseModel):
+    free_only: bool
+    open_now: bool
+    wheelchair_required: bool
+    max_walk_miles: Optional[float] = Field(default=None, description="Straight-line distance from the start point.")
+
+
+class RejectedPlaceSchema(BaseModel):
+    location_name: str
+    distance_miles: float
+    reasons: list[str] = Field(min_length=1)
+
+
+class RankingBucketSchema(BaseModel):
+    bucket: Bucket
+    recommendation: RecommendationItem
+
+
+class TravelPlanSchema(BaseModel):
+    travel_style: TravelStyle
+    weights: ScoreWeightsSchema
+    constraints: HardConstraintsSchema
+    local_time: Optional[datetime] = Field(
+        default=None,
+        description="Wall-clock time at the origin used for the open-now check. Null when hours were not checked.",
+    )
+    buckets: list[RankingBucketSchema] = Field(description="Only buckets the place data supports.")
+    rejected: list[RejectedPlaceSchema]
+    explanation: str = Field(description="States only the scores, weights and counts in this response.")
+
+
 class RecommendationResponse(BaseModel):
     latitude: float
     longitude: float
@@ -129,3 +169,4 @@ class RecommendationResponse(BaseModel):
     recommendations: list[RecommendationItem]
     demo_mode: bool = False
     source_note: Optional[str] = None
+    travel_plan: Optional[TravelPlanSchema] = Field(default=None, description="Set only when travel_style is requested.")

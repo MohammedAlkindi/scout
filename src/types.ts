@@ -12,6 +12,10 @@ export type LightPhase = "golden_hour" | "blue_hour" | "daylight" | "night";
 
 export type ShotType = "landscape" | "portrait" | "astro" | "wildlife" | "urban" | "hiking";
 
+export type TravelStyle = "photographer" | "sightseeing" | "family" | "budget" | "accessible";
+
+export type RankingBucketName = "best_overall" | "free" | "rainy_day";
+
 /** An ISO 8601 UTC timestamp string, e.g. "2026-07-05T02:57:26.713324Z". */
 export type IsoDateTimeString = string;
 
@@ -51,6 +55,43 @@ export interface RecommendationItem {
   image_attribution: string | null;
 }
 
+export interface ScoreWeights {
+  light: number;
+  weather: number;
+  crowd: number;
+  access: number;
+}
+
+export interface HardConstraints {
+  free_only: boolean;
+  open_now: boolean;
+  wheelchair_required: boolean;
+  max_walk_miles: number | null;
+}
+
+export interface RejectedPlace {
+  location_name: string;
+  distance_miles: number;
+  reasons: string[];
+}
+
+export interface RankingBucket {
+  bucket: RankingBucketName;
+  recommendation: RecommendationItem;
+}
+
+/** Present only when the request sets travel_style. */
+export interface TravelPlan {
+  travel_style: TravelStyle;
+  weights: ScoreWeights;
+  constraints: HardConstraints;
+  /** Wall-clock time at the origin, without an offset. Null when opening hours were not checked. */
+  local_time: string | null;
+  buckets: RankingBucket[];
+  rejected: RejectedPlace[];
+  explanation: string;
+}
+
 export interface RecommendationResponse {
   latitude: number;
   longitude: number;
@@ -60,6 +101,7 @@ export interface RecommendationResponse {
   recommendations: RecommendationItem[];
   demo_mode?: boolean;
   source_note?: string | null;
+  travel_plan?: TravelPlan | null;
 }
 
 export interface RecommendationRequest {
@@ -68,6 +110,7 @@ export interface RecommendationRequest {
   intent: string;
   radius_miles?: number;
   shot_type?: ShotType;
+  travel_style?: TravelStyle;
 }
 
 /** Shape of every error response body the backend returns (never a raw exception). */

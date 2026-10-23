@@ -35,6 +35,7 @@ from server.schemas import (
     ScoreWindowResponse,
 )
 from server.services.scorer import CrowdLevel, ShotType
+from server.services.travel_styles import TravelStyle
 
 logger = logging.getLogger("scout.api")
 
@@ -207,13 +208,14 @@ class RecommendationRequest(BaseModel):
     intent: str = Field(min_length=1)
     radius_miles: float = Field(default=15.0, gt=0, le=100)
     shot_type: Optional[ShotType] = None
+    travel_style: Optional[TravelStyle] = None
 
 
 @app.post("/api/recommendation", response_model=RecommendationResponse, dependencies=[_rate_limited])
 async def recommendation_route(body: RecommendationRequest) -> RecommendationResponse:
     started = perf_counter()
     response = await orchestration.build_recommendation(
-        body.latitude, body.longitude, body.intent, body.radius_miles, body.shot_type
+        body.latitude, body.longitude, body.intent, body.radius_miles, body.shot_type, body.travel_style
     )
     elapsed_ms = round((perf_counter() - started) * 1000)
     top = response.recommendations[0] if response.recommendations else None
