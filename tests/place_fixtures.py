@@ -56,3 +56,11 @@ def window_contexts() -> list[WindowContext]:
         for window in _DATA["windows"]
     ]
 
+
+
+def window_label(window: TimeWindow) -> str:
+    """The fixture label of a window, so golden files stay readable."""
+    for entry in _DATA["windows"]:
+        if datetime.fromisoformat(entry["start_utc"]) == window.start:
+            return str(entry["label"])
+    raise KeyError(window.start)

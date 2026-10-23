@@ -1,0 +1,483 @@
+{
+  "default": {
+    "ranked": [
+      {
+        "name": "Garden Park",
+        "score": 97,
+        "window": "golden_hour_evening",
+        "breakdown": {
+          "light": 100.0,
+          "weather": 91.9,
+          "crowd": 100.0,
+          "access": 97.4
+        }
+      },
+      {
+        "name": "Ridge Summit",
+        "score": 93,
+        "window": "golden_hour_evening",
+        "breakdown": {
+          "light": 100.0,
+          "weather": 91.9,
+          "crowd": 100.0,
+          "access": 68.1
+        }
+      },
+      {
+        "name": "Harbor Viewpoint",
+        "score": 89,
+        "window": "golden_hour_evening",
+        "breakdown": {
+          "light": 100.0,
+          "weather": 91.9,
+          "crowd": 60.0,
+          "access": 98.0
+        }
+      },
+      {
+        "name": "Corniche Promenade",
+        "score": 89,
+        "window": "golden_hour_evening",
+        "breakdown": {
+          "light": 100.0,
+          "weather": 91.9,
+          "crowd": 60.0,
+          "access": 96.1
+        }
+      },
+      {
+        "name": "Beach Club",
+        "score": 85,
+        "window": "golden_hour_evening",
+        "breakdown": {
+          "light": 100.0,
+          "weather": 91.9,
+          "crowd": 60.0,
+          "access": 67.0
+        }
+      },
+      {
+        "name": "Old Fort Museum",
+        "score": 84,
+        "window": "golden_hour_evening",
+        "breakdown": {
+          "light": 100.0,
+          "weather": 91.9,
+          "crowd": 60.0,
+          "access": 63.7
+        }
+      },
+      {
+        "name": "Covered Souq",
+        "score": 78,
+        "window": "golden_hour_evening",
+        "breakdown": {
+          "light": 100.0,
+          "weather": 91.9,
+          "crowd": 25.0,
+          "access": 72.0
+        }
+      }
+    ]
+  },
+  "photographer": {
+    "ranked": [
+      {
+        "name": "Garden Park",
+        "score": 97,
+        "window": "golden_hour_evening",
+        "breakdown": {
+          "light": 100.0,
+          "weather": 91.9,
+          "crowd": 100.0,
+          "access": 97.4
+        }
+      },
+      {
+        "name": "Ridge Summit",
+        "score": 93,
+        "window": "golden_hour_evening",
+        "breakdown": {
+          "light": 100.0,
+          "weather": 91.9,
+          "crowd": 100.0,
+          "access": 68.1
+        }
+      },
+      {
+        "name": "Harbor Viewpoint",
+        "score": 89,
+        "window": "golden_hour_evening",
+        "breakdown": {
+          "light": 100.0,
+          "weather": 91.9,
+          "crowd": 60.0,
+          "access": 98.0
+        }
+      },
+      {
+        "name": "Corniche Promenade",
+        "score": 89,
+        "window": "golden_hour_evening",
+        "breakdown": {
+          "light": 100.0,
+          "weather": 91.9,
+          "crowd": 60.0,
+          "access": 96.1
+        }
+      },
+      {
+        "name": "Beach Club",
+        "score": 85,
+        "window": "golden_hour_evening",
+        "breakdown": {
+          "light": 100.0,
+          "weather": 91.9,
+          "crowd": 60.0,
+          "access": 67.0
+        }
+      },
+      {
+        "name": "Old Fort Museum",
+        "score": 84,
+        "window": "golden_hour_evening",
+        "breakdown": {
+          "light": 100.0,
+          "weather": 91.9,
+          "crowd": 60.0,
+          "access": 63.7
+        }
+      },
+      {
+        "name": "Covered Souq",
+        "score": 78,
+        "window": "golden_hour_evening",
+        "breakdown": {
+          "light": 100.0,
+          "weather": 91.9,
+          "crowd": 25.0,
+          "access": 72.0
+        }
+      }
+    ],
+    "rejected": [],
+    "buckets": {
+      "best_overall": "Garden Park",
+      "free": "Garden Park",
+      "rainy_day": "Old Fort Museum"
+    },
+    "explanation": "The photographer style weighs light 0.35, weather 0.30, crowd 0.20 and access 0.15. Garden Park ranks first with a score of 97 (light 100.0, weather 91.9, crowd 100.0, access 97.4). The runner-up is Ridge Summit with a score of 93. No place was removed by hard constraints."
+  },
+  "sightseeing": {
+    "ranked": [
+      {
+        "name": "Garden Park",
+        "score": 97,
+        "window": "golden_hour_evening",
+        "breakdown": {
+          "light": 100.0,
+          "weather": 91.9,
+          "crowd": 100.0,
+          "access": 97.4
+        }
+      },
+      {
+        "name": "Harbor Viewpoint",
+        "score": 89,
+        "window": "golden_hour_evening",
+        "breakdown": {
+          "light": 100.0,
+          "weather": 91.9,
+          "crowd": 60.0,
+          "access": 98.0
+        }
+      },
+      {
+        "name": "Corniche Promenade",
+        "score": 88,
+        "window": "golden_hour_evening",
+        "breakdown": {
+          "light": 100.0,
+          "weather": 91.9,
+          "crowd": 60.0,
+          "access": 96.1
+        }
+      },
+      {
+        "name": "Ridge Summit",
+        "score": 86,
+        "window": "golden_hour_evening",
+        "breakdown": {
+          "light": 100.0,
+          "weather": 91.9,
+          "crowd": 100.0,
+          "access": 68.1
+        }
+      },
+      {
+        "name": "Covered Souq",
+        "score": 73,
+        "window": "golden_hour_evening",
+        "breakdown": {
+          "light": 100.0,
+          "weather": 91.9,
+          "crowd": 25.0,
+          "access": 72.0
+        }
+      }
+    ],
+    "rejected": [
+      {
+        "name": "Old Fort Museum",
+        "reasons": [
+          "Closed at Fri 18:00 local time (opening_hours \"Sa-Th 09:00-17:00\")."
+        ]
+      },
+      {
+        "name": "Beach Club",
+        "reasons": [
+          "Closed at Fri 18:00 local time (opening_hours \"Mo-Su 08:00-18:00\")."
+        ]
+      }
+    ],
+    "buckets": {
+      "best_overall": "Garden Park",
+      "free": "Garden Park",
+      "rainy_day": "Covered Souq"
+    },
+    "explanation": "The sightseeing style weighs light 0.15, weather 0.30, crowd 0.20 and access 0.35. Garden Park ranks first with a score of 97 (light 100.0, weather 91.9, crowd 100.0, access 97.4). The runner-up is Harbor Viewpoint with a score of 89. 2 of 7 places were removed by hard constraints."
+  },
+  "family": {
+    "ranked": [
+      {
+        "name": "Garden Park",
+        "score": 97,
+        "window": "blue_hour_evening",
+        "breakdown": {
+          "light": 80.0,
+          "weather": 98.8,
+          "crowd": 100.0,
+          "access": 97.4
+        }
+      },
+      {
+        "name": "Harbor Viewpoint",
+        "score": 89,
+        "window": "blue_hour_evening",
+        "breakdown": {
+          "light": 80.0,
+          "weather": 98.8,
+          "crowd": 60.0,
+          "access": 98.0
+        }
+      },
+      {
+        "name": "Covered Souq",
+        "score": 73,
+        "window": "blue_hour_evening",
+        "breakdown": {
+          "light": 80.0,
+          "weather": 98.8,
+          "crowd": 25.0,
+          "access": 72.0
+        }
+      }
+    ],
+    "rejected": [
+      {
+        "name": "Old Fort Museum",
+        "reasons": [
+          "Closed at Fri 18:00 local time (opening_hours \"Sa-Th 09:00-17:00\")."
+        ]
+      },
+      {
+        "name": "Corniche Promenade",
+        "reasons": [
+          "2.3 mi in a straight line from the start point, beyond the 1.5 mi walking limit."
+        ]
+      },
+      {
+        "name": "Ridge Summit",
+        "reasons": [
+          "6.5 mi in a straight line from the start point, beyond the 1.5 mi walking limit."
+        ]
+      },
+      {
+        "name": "Beach Club",
+        "reasons": [
+          "Closed at Fri 18:00 local time (opening_hours \"Mo-Su 08:00-18:00\").",
+          "3.1 mi in a straight line from the start point, beyond the 1.5 mi walking limit."
+        ]
+      }
+    ],
+    "buckets": {
+      "best_overall": "Garden Park",
+      "free": "Garden Park",
+      "rainy_day": "Covered Souq"
+    },
+    "explanation": "The family style weighs light 0.10, weather 0.35, crowd 0.20 and access 0.35. Garden Park ranks first with a score of 97 (light 80.0, weather 98.8, crowd 100.0, access 97.4). The runner-up is Harbor Viewpoint with a score of 89. 4 of 7 places were removed by hard constraints."
+  },
+  "budget": {
+    "ranked": [
+      {
+        "name": "Garden Park",
+        "score": 97,
+        "window": "golden_hour_evening",
+        "breakdown": {
+          "light": 100.0,
+          "weather": 91.9,
+          "crowd": 100.0,
+          "access": 97.4
+        }
+      },
+      {
+        "name": "Harbor Viewpoint",
+        "score": 91,
+        "window": "golden_hour_evening",
+        "breakdown": {
+          "light": 100.0,
+          "weather": 91.9,
+          "crowd": 60.0,
+          "access": 98.0
+        }
+      },
+      {
+        "name": "Corniche Promenade",
+        "score": 90,
+        "window": "golden_hour_evening",
+        "breakdown": {
+          "light": 100.0,
+          "weather": 91.9,
+          "crowd": 60.0,
+          "access": 96.1
+        }
+      },
+      {
+        "name": "Ridge Summit",
+        "score": 88,
+        "window": "golden_hour_evening",
+        "breakdown": {
+          "light": 100.0,
+          "weather": 91.9,
+          "crowd": 100.0,
+          "access": 68.1
+        }
+      },
+      {
+        "name": "Covered Souq",
+        "score": 78,
+        "window": "golden_hour_evening",
+        "breakdown": {
+          "light": 100.0,
+          "weather": 91.9,
+          "crowd": 25.0,
+          "access": 72.0
+        }
+      }
+    ],
+    "rejected": [
+      {
+        "name": "Old Fort Museum",
+        "reasons": [
+          "OpenStreetMap tags an entry fee here, and this travel style keeps only free places."
+        ]
+      },
+      {
+        "name": "Beach Club",
+        "reasons": [
+          "OpenStreetMap tags an entry fee here, and this travel style keeps only free places."
+        ]
+      }
+    ],
+    "buckets": {
+      "best_overall": "Garden Park",
+      "free": "Garden Park",
+      "rainy_day": "Covered Souq"
+    },
+    "explanation": "The budget style weighs light 0.25, weather 0.30, crowd 0.15 and access 0.30. Garden Park ranks first with a score of 97 (light 100.0, weather 91.9, crowd 100.0, access 97.4). The runner-up is Harbor Viewpoint with a score of 91. 2 of 7 places were removed by hard constraints."
+  },
+  "accessible": {
+    "ranked": [
+      {
+        "name": "Garden Park",
+        "score": 97,
+        "window": "golden_hour_evening",
+        "breakdown": {
+          "light": 100.0,
+          "weather": 91.9,
+          "crowd": 100.0,
+          "access": 97.4
+        }
+      },
+      {
+        "name": "Harbor Viewpoint",
+        "score": 91,
+        "window": "golden_hour_evening",
+        "breakdown": {
+          "light": 100.0,
+          "weather": 91.9,
+          "crowd": 60.0,
+          "access": 98.0
+        }
+      },
+      {
+        "name": "Corniche Promenade",
+        "score": 90,
+        "window": "golden_hour_evening",
+        "breakdown": {
+          "light": 100.0,
+          "weather": 91.9,
+          "crowd": 60.0,
+          "access": 96.1
+        }
+      },
+      {
+        "name": "Ridge Summit",
+        "score": 84,
+        "window": "golden_hour_evening",
+        "breakdown": {
+          "light": 100.0,
+          "weather": 91.9,
+          "crowd": 100.0,
+          "access": 68.1
+        }
+      },
+      {
+        "name": "Beach Club",
+        "score": 77,
+        "window": "golden_hour_evening",
+        "breakdown": {
+          "light": 100.0,
+          "weather": 91.9,
+          "crowd": 60.0,
+          "access": 67.0
+        }
+      },
+      {
+        "name": "Old Fort Museum",
+        "score": 76,
+        "window": "golden_hour_evening",
+        "breakdown": {
+          "light": 100.0,
+          "weather": 91.9,
+          "crowd": 60.0,
+          "access": 63.7
+        }
+      }
+    ],
+    "rejected": [
+      {
+        "name": "Covered Souq",
+        "reasons": [
+          "OpenStreetMap tags this place as not wheelchair accessible."
+        ]
+      }
+    ],
+    "buckets": {
+      "best_overall": "Garden Park",
+      "free": "Garden Park",
+      "rainy_day": "Old Fort Museum"
+    },
+    "explanation": "The accessible style weighs light 0.15, weather 0.25, crowd 0.15 and access 0.45. Garden Park ranks first with a score of 97 (light 100.0, weather 91.9, crowd 100.0, access 97.4). The runner-up is Harbor Viewpoint with a score of 91. 1 of 7 places was removed by hard constraints."
+  }
+}
