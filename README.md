@@ -19,6 +19,9 @@ Live demo: [https://scoutphotography.vercel.app](https://scoutphotography.vercel
 - Calculates sunrise, sunset, golden hour, blue hour, solar noon, and azimuth.
 - Pulls current and hourly weather from Open-Meteo.
 - Scores each place/time window with deterministic service-layer logic.
+- Ranks for an optional travel style (photographer, sightseeing, family, budget,
+  accessible). Each style sets the score weights and hard constraints, and
+  places a constraint removes come back with the reason.
 - Shows a map-first result view with ranked pins, cards, directions, and media previews.
 - Explains each recommendation with score breakdowns, confidence, reason tags, and caveats.
 - Labels each card with trust badges for live, estimated, and fallback signals.
@@ -78,7 +81,7 @@ Both `server/api.py` and `server/mcp_server.py` call
 | `get_conditions` | Returns current weather and a 24-hour forecast. |
 | `get_locations` | Finds nearby location candidates for a scouting intent. |
 | `score_window` | Scores a location/time window against conditions. |
-| `build_recommendation` | Produces the ranked end-to-end recommendation set. |
+| `build_recommendation` | Produces the ranked end-to-end recommendation set, optionally for a travel style. |
 
 ## Data Sources
 

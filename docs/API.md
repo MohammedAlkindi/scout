@@ -187,11 +187,27 @@ Request body:
   "longitude": 58.4026,
   "intent": "romantic golden hour portraits",
   "radius_miles": 15,
-  "shot_type": "portrait"
+  "shot_type": "portrait",
+  "travel_style": "sightseeing"
 }
 ```
 
 `shot_type` is optional. If omitted, Scout infers it from the intent.
+
+`travel_style` is optional. Without it the response is the default
+photographer ranking and has no `travel_plan`. With it, the ranking uses that
+style's weights and hard constraints, and the response adds `travel_plan`:
+
+- `travel_style`, `weights` and `constraints`: the profile that was applied
+- `local_time`: the wall-clock time used for the open-now check, or null when
+  opening hours were not checked
+- `buckets`: named picks (`best_overall`, `free`, `rainy_day`), each present
+  only when the place data supports it
+- `rejected`: places a hard constraint removed, each with its reasons
+- `explanation`: a summary that states only the scores, weights and counts in
+  the response
+
+The styles and their weights are described in [SCORING.md](SCORING.md#travel-styles).
 
 Response includes:
 
@@ -244,6 +260,18 @@ Recommendation confidence:
 
 ```text
 high, medium, low
+```
+
+Travel styles:
+
+```text
+photographer, sightseeing, family, budget, accessible
+```
+
+Ranking buckets:
+
+```text
+best_overall, free, rainy_day
 ```
 
 ## Notes

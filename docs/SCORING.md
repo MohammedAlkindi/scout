@@ -60,6 +60,39 @@ The final score is a weighted blend:
 The response exposes these sub-scores in `score_breakdown` so the UI can show
 why a recommendation ranked well.
 
+## Travel Styles
+
+A request can name a `travel_style`. Each style is data in
+`server/services/travel_styles.py`: a set of weights for the four components
+above plus hard constraints. No other code branches on the style. Without a
+style, Scout ranks exactly as the `photographer` style does.
+
+| Style | Light | Weather | Crowd | Access | Hard constraints |
+| --- | ---: | ---: | ---: | ---: | --- |
+| `photographer` | 35% | 30% | 20% | 15% | none |
+| `sightseeing` | 15% | 30% | 20% | 35% | open now |
+| `family` | 10% | 35% | 20% | 35% | open now, within 1.5 mi |
+| `budget` | 25% | 30% | 15% | 30% | free entry only |
+| `accessible` | 15% | 25% | 15% | 45% | not tagged as inaccessible |
+
+A hard constraint is not traded off against the score. A place that fails one
+is dropped and returned in `travel_plan.rejected` with each reason. A
+constraint only rejects a place when OpenStreetMap tags the fact it checks, so
+an untagged fee, unknown opening hours or untagged wheelchair access never
+removes a place:
+
+- **Open now** drops a place whose `opening_hours` say it is closed at the
+  local time. It is skipped when Scout cannot work out the local time.
+- **Within 1.5 mi** is straight-line distance from the start point, not a
+  walking route.
+- **Free entry only** drops places tagged with a fee (`fee=yes` or an amount).
+- **Not tagged as inaccessible** drops places tagged `wheelchair=no`.
+
+The styled response also names picks from the ranking, each only when the data
+supports it: `best_overall`, `free` (the best place tagged `fee=no`) and
+`rainy_day` (the best place tagged `indoor=yes` or `covered=yes`). There is no
+best-light pick, because every place shares the same light windows.
+
 ## Weather Model
 
 Weather scoring uses:
