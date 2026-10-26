@@ -5,6 +5,7 @@
   "description": "Location-aware photography and outdoor activity recommendations, grounded in live conditions.",
   "scripts": {
     "build": "tsc",
+    "postbuild": "node scripts/check-assets.mjs",
     "ci": "npm run typecheck && npm run build && npm run test:e2e",
     "test:e2e": "playwright test",
     "watch": "tsc --watch",

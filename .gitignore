@@ -224,6 +224,7 @@ AGENTS.md
 
 # Node / TypeScript
 node_modules/
+public/assets/
 playwright-report/
 test-results/
 api/public/

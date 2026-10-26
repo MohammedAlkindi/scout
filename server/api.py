@@ -235,5 +235,5 @@ async def recommendation_route(body: RecommendationRequest) -> RecommendationRes
 _PUBLIC_DIR = Path(os.environ.get("SCOUT_PUBLIC_DIR", Path(__file__).resolve().parent.parent / "public"))
 
 # Mounted last and at "/" so the /api/* routes above always take precedence.
-if _PUBLIC_DIR.exists():
+if _PUBLIC_DIR.exists() and not os.environ.get("VERCEL"):
     app.mount("/", StaticFiles(directory=_PUBLIC_DIR, html=True), name="public")

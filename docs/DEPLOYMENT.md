@@ -15,8 +15,8 @@ https://scoutphotography.vercel.app
 
 | File | Purpose |
 | --- | --- |
-| `vercel.json` | Builds the frontend, serves `public`, redirects `/` to `/index.html`, and routes `/api/*` to FastAPI. |
-| `api/index.py` | ASGI entrypoint imported by Vercel's Python runtime. |
+| `vercel.json` | Builds the frontend, uses the native FastAPI preset, and redirects `/` to `/index.html`. |
+| `app.py` | Explicit native FastAPI entrypoint. API paths are preserved without internal rewrites. |
 | `.vercelignore` | Excludes local secrets, virtualenvs, node modules, and test output. |
 | `requirements.txt` | Python dependencies for the API runtime. |
 | `package.json` | TypeScript build and browser test scripts. |
@@ -29,7 +29,7 @@ Vercel runs:
 npm ci && npm run build
 ```
 
-The TypeScript compiler writes browser JavaScript into `public/dist/`.
+The TypeScript compiler writes browser JavaScript into `public/assets/`. The postbuild check verifies the module entrypoint and its imports. The generated directory avoids the generic `dist/` ignore rule; it is rebuilt on Vercel rather than committed.
 
 ## Routing
 
@@ -38,12 +38,11 @@ Expected public routing:
 ```text
 /              -> /index.html
 /index.html    -> static frontend
-/dist/*        -> static frontend assets
-/api/*         -> FastAPI through api/index.py
+/assets/*      -> static frontend assets
+/api/*         -> FastAPI through app.py, with the original URL path
 ```
 
-The FastAPI application also mounts `public/` locally so the same backend can
-serve the app during development.
+The FastAPI application mounts `public/` locally. On Vercel, the platform serves that directory from its CDN; the application does not mount it again.
 
 ## Environment Variables
 
@@ -126,7 +125,7 @@ Static frontend works but API fails
 runtime dependencies.
 
 Local app works but deployed app cannot load assets
-: Run `npm run build` and confirm `public/dist/` is generated before deploy.
+: Run `npm run build` and confirm `public/assets/` is generated before deploy.
 
 Location search returns `Location provider is rate-limited`
 : OpenStreetMap Overpass returned `429 Too Many Requests`. This usually means a
