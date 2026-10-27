@@ -4,7 +4,7 @@ All external service endpoints and tunables are read here once so no other
 module reaches into ``os.environ`` directly.
 
 ASSUMPTION: Scout deliberately uses free, keyless APIs -- Open-Meteo for
-weather and OpenStreetMap Overpass for locations -- so the project runs
+weather and OpenStreetMap via Photon for locations -- so the project runs
 with zero API keys and zero signup friction. The environment variables
 below only override hosting endpoints, timeouts, and rate limits; there is
 nothing secret to configure.
@@ -34,6 +34,10 @@ def _env_csv(name: str, default: tuple[str, ...]) -> tuple[str, ...]:
 
 
 OPEN_METEO_BASE_URL = os.environ.get("OPEN_METEO_BASE_URL", "https://api.open-meteo.com/v1/forecast")
+LOCATIONS_PROVIDER = os.environ.get("SCOUT_LOCATIONS_PROVIDER", "photon")
+PHOTON_BASE_URL = os.environ.get("PHOTON_BASE_URL", "https://photon.komoot.io/reverse")
+PHOTON_TIMEOUT_SECONDS = _env_float("SCOUT_PHOTON_TIMEOUT_SECONDS", 10.0)
+
 OVERPASS_BASE_URL = os.environ.get("OVERPASS_BASE_URL", "https://overpass.private.coffee/api/interpreter")
 OVERPASS_BASE_URLS = _env_csv(
     "OVERPASS_BASE_URLS",

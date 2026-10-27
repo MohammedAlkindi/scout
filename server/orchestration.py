@@ -683,5 +683,10 @@ async def build_recommendation(
         shot_type=resolved_shot_type,
         generated_at=now,
         recommendations=items,
+        source_note=(
+            "Places: OpenStreetMap contributors via Photon (Komoot). Weather: Open-Meteo. "
+            "Map coverage and updates vary; access, fees and opening hours may be missing. Verify locally."
+            if any(candidate.data_source == "photon" for candidate in candidates) else None
+        ),
         travel_plan=travel_plan,
     )

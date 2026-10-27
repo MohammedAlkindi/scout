@@ -52,15 +52,18 @@ Optional environment variables:
 
 | Variable | Purpose |
 | --- | --- |
+| `SCOUT_LOCATIONS_PROVIDER` | `photon` (default) or `overpass` (optional legacy backend). |
+| `PHOTON_BASE_URL` | Photon reverse endpoint; defaults to `https://photon.komoot.io/reverse`. |
+| `SCOUT_PHOTON_TIMEOUT_SECONDS` | Hard deadline and HTTP timeout for a Photon lookup; defaults to `10` seconds. |
 | `OPEN_METEO_BASE_URL` | Override weather provider endpoint. |
 | `OVERPASS_BASE_URL` | Override Overpass endpoint. |
-| `OVERPASS_BASE_URLS` | Optional comma-separated Overpass-compatible endpoint list for failover. Defaults to the primary Overpass endpoint plus a tested Overpass-compatible mirror. |
+| `OVERPASS_BASE_URLS` | Optional comma-separated Overpass-compatible endpoint list for failover. Defaults to the primary Overpass endpoint plus the VK Maps mirror (availability varies). |
 | `SCOUT_OVERPASS_QUERY_TIMEOUT_SECONDS` | Overpass query timeout embedded in the Overpass query. Defaults to `15`. |
 | `SCOUT_OVERPASS_HTTP_TIMEOUT_SECONDS` | HTTP timeout for each Overpass request. Defaults to `20`. |
 | `SCOUT_OVERPASS_MAX_ATTEMPTS` | Maximum focused Overpass attempts per location search. Defaults to `8`. |
 | `SCOUT_OVERPASS_SEARCH_TIMEOUT_SECONDS` | Overall location-search request budget; defaults to `45` seconds. |
 | `SCOUT_OVERPASS_RATE_LIMIT_COOLDOWN_SECONDS` | In-process cooldown after an Overpass `429`. Defaults to `60`. |
-| `SCOUT_HTTP_USER_AGENT` | User-Agent sent to Overpass. |
+| `SCOUT_HTTP_USER_AGENT` | Project-identifying User-Agent sent to map providers. |
 | `SCOUT_HTTP_TIMEOUT_SECONDS` | Outbound HTTP timeout. |
 | `SCOUT_WEATHER_CACHE_TTL_SECONDS` | Weather cache TTL. |
 | `SCOUT_LOCATIONS_CACHE_TTL_SECONDS` | Location cache TTL. |
@@ -156,4 +159,8 @@ creating duplicates.
 
 ### Live-provider resilience
 
-Scout uses [Private.coffee Overpass](https://overpass.private.coffee/) as its default map endpoint, with the VK Maps mirror as sequential failover. Requests identify the project, cache map results for 24 hours, and respect cooldowns. Query execution gets 15 seconds and HTTP transport 20 seconds, within a 45-second search budget. All narrow intent tags share a query so successful empty searches can expand through the requested radius rather than exhausting attempts on individual tags. The bundled Muscat fallback remains explicitly labeled during genuine outages. Weather continues to use Open-Meteo.
+The default backend is [Photon by Komoot](https://github.com/komoot/photon), a keyless OpenStreetMap geocoder whose reverse endpoint supports nearby principal-tag filters. Scout queries only the activity categories, validates coordinates/OSM identities, rejects results beyond the requested straight-line radius, deduplicates, and ranks the candidates with live Open-Meteo weather and calculated light windows. Missing fee, access, opening-hour and image fields stay unknown; the response identifies Photon and explains the coverage limits.
+
+Komoot allows reasonable project usage of the public endpoint, without an availability guarantee. Scout keeps the existing map cache (24 hours), outbound rate limits and a 10-second lookup deadline. Do not use this public service for bulk extraction. OpenStreetMap contributors remain credited by the map and the response source note. Photon is an index of OSM, not an observation that a place is currently open.
+
+`SCOUT_LOCATIONS_PROVIDER=overpass` retains the legacy Overpass backend for explicitly configured deployments. Its optional endpoints, retry settings and cooldowns above apply only to that backend. Genuine provider outages retain the explicitly labeled Muscat demo fallback; outside demo-eligible requests the API returns structured errors.

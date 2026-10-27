@@ -1,15 +1,9 @@
-"""Candidate location search via OpenStreetMap Overpass API.
+"""Named OpenStreetMap places via Photon, with an optional Overpass backend.
 
-ASSUMPTION: OpenStreetMap/Overpass was chosen (over a paid places API like
-Google Places or Foursquare) because it is free, keyless, and its tag
-vocabulary (natural=peak, tourism=viewpoint, leisure=nature_reserve, ...)
-maps well onto photography/outdoor terrain types without a licensing
-agreement. The tradeoff: coverage and tag completeness vary by region, and
-"permit required" / "crowd level" are best-effort heuristics inferred from
-whatever tags a given contributor happened to add -- never authoritative.
-Every returned candidate should be read as "worth checking," not "verified."
-
-Overpass rejects requests without a descriptive User-Agent header.
+Photon provides free, keyless nearby category search suitable for modest
+project usage. Both providers have incomplete and region-dependent tags;
+access, fee and crowd signals are best-effort metadata or heuristics, never
+proof that a location is currently open, accessible or safe to visit.
 """
 
 from __future__ import annotations
@@ -17,7 +11,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from time import monotonic, perf_counter
 from typing import Optional
 
@@ -130,6 +124,7 @@ class LocationCandidate:
     wheelchair: Optional[str] = None
     # indoor=yes or covered=yes: an option when it rains.
     indoor: bool = False
+    data_source: str = "overpass"
 
 
 def _tags_for_intent(intent: str) -> list[tuple[str, str]]:
@@ -431,7 +426,7 @@ def _candidates_from_elements(origin_lat: float, origin_lng: float, elements: ob
     return candidates
 
 
-async def find_locations(
+async def _find_overpass_locations(
     lat: float, lng: float, radius_miles: float, intent: str, limit: int = 10
 ) -> list[LocationCandidate]:
     """Find named candidate locations near (lat, lng) matching a shot/activity intent.
@@ -439,8 +434,6 @@ async def find_locations(
     Raises UpstreamServiceError on network failure and NoCandidatesFoundError
     when the search succeeds but nothing named matches within the radius.
     """
-    await _rate_limiter.acquire()
-
     tags = _tags_for_intent(intent)
 
     last_upstream_error: Optional[UpstreamServiceError] = None
@@ -525,3 +518,95 @@ async def find_locations(
         raise last_upstream_error
 
     raise NoCandidatesFoundError("No named locations found matching this description in the given radius.")
+
+
+def _photon_candidates(lat: float, lng: float, radius_miles: float, tags: list[tuple[str, str]], data: dict) -> list[LocationCandidate]:
+    """Normalize verified GeoJSON facts; never fill missing access tags."""
+    features = data.get("features")
+    if not isinstance(features, list):
+        raise UpstreamServiceError(_LOCATION_UNAVAILABLE_MESSAGE)
+    candidates: list[LocationCandidate] = []
+    seen: set[tuple[str, int]] = set()
+    for feature in features:
+        if not isinstance(feature, dict):
+            continue
+        props = feature.get("properties")
+        geometry = feature.get("geometry")
+        if not isinstance(props, dict) or not isinstance(geometry, dict) or geometry.get("type") != "Point":
+            continue
+        coords = geometry.get("coordinates")
+        if not isinstance(coords, list) or len(coords) != 2:
+            continue
+        if any(isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v) for v in coords):
+            continue
+        plng, plat = coords
+        if not (-90 <= plat <= 90 and -180 <= plng <= 180):
+            continue
+        key, value = props.get("osm_key"), props.get("osm_value")
+        name, osm_id, osm_type = props.get("name"), props.get("osm_id"), props.get("osm_type")
+        if (key, value) not in tags or not isinstance(name, str) or not name.strip():
+            continue
+        if isinstance(osm_id, bool) or not isinstance(osm_id, int) or osm_id <= 0 or osm_type not in ("N", "W", "R"):
+            continue
+        identity = (osm_type, osm_id)
+        if identity in seen or _haversine_miles(lat, lng, plat, plng) > radius_miles:
+            continue
+        raw_tags = {"name": name.strip(), key: value}
+        extra = props.get("extra", {})
+        if isinstance(extra, dict):
+            for tag in ("access", "wheelchair", "surface", "fee", "opening_hours", "indoor", "covered", "image", "wikimedia_commons", "wikipedia", "wikidata"):
+                if isinstance(extra.get(tag), str):
+                    raw_tags[tag] = extra[tag]
+        candidate = _candidate_from_element(lat, lng, {"id": osm_id, "lat": plat, "lon": plng, "tags": raw_tags})
+        if candidate is not None:
+            candidates.append(replace(candidate, data_source="photon"))
+            seen.add(identity)
+    candidates.sort(key=lambda candidate: candidate.distance_miles)
+    return candidates
+
+
+async def _find_photon_locations(lat: float, lng: float, radius_miles: float, intent: str, limit: int) -> list[LocationCandidate]:
+    tags = _tags_for_intent(intent)
+    # Photon reverse searches nearby POIs by principal OSM tags. Unlike text
+    # search this does not depend on the place name containing an English word.
+    params: list[tuple[str, object]] = [
+        ("lat", lat), ("lon", lng), ("radius", min(radius_miles * 1.609344, 5000)),
+        ("limit", _MAX_RAW_RESULTS), ("lang", "en"),
+    ]
+    params.extend(("osm_tag", f"{key}:{value}") for key, value in tags)
+    started = perf_counter()
+    try:
+        async with asyncio.timeout(config.PHOTON_TIMEOUT_SECONDS):
+            async with httpx.AsyncClient(timeout=config.PHOTON_TIMEOUT_SECONDS) as client:
+                response = await client.get(config.PHOTON_BASE_URL, params=params, headers={"User-Agent": config.HTTP_USER_AGENT})
+                response.raise_for_status()
+                data = response.json()
+                if not isinstance(data, dict):
+                    raise ValueError("expected feature collection")
+                candidates = _photon_candidates(lat, lng, radius_miles, tags, data)
+    except httpx.HTTPStatusError as exc:
+        outcome = "rate_limited" if exc.response.status_code == 429 else "http_error"
+        record_upstream_call("photon", outcome, round((perf_counter() - started) * 1000), exc.response.status_code)
+        if exc.response.status_code == 429:
+            raise RateLimitedError(_LOCATION_RATE_LIMIT_MESSAGE) from exc
+        raise UpstreamServiceError(_LOCATION_UNAVAILABLE_MESSAGE) from exc
+    except (httpx.TimeoutException, TimeoutError) as exc:
+        record_upstream_call("photon", "timeout", round((perf_counter() - started) * 1000))
+        raise UpstreamServiceError(_LOCATION_UNAVAILABLE_MESSAGE) from exc
+    except (httpx.HTTPError, ValueError, UpstreamServiceError) as exc:
+        record_upstream_call("photon", "error", round((perf_counter() - started) * 1000))
+        raise UpstreamServiceError(_LOCATION_UNAVAILABLE_MESSAGE) from exc
+    record_upstream_call("photon", "success", round((perf_counter() - started) * 1000), response.status_code)
+    if not candidates:
+        raise NoCandidatesFoundError("No named locations found matching this description in the given radius.")
+    return candidates[:limit]
+
+
+async def find_locations(lat: float, lng: float, radius_miles: float, intent: str, limit: int = 10) -> list[LocationCandidate]:
+    """Fetch named OSM places through the configured free provider."""
+    await _rate_limiter.acquire()
+    if config.LOCATIONS_PROVIDER == "photon":
+        return await _find_photon_locations(lat, lng, radius_miles, intent, limit)
+    if config.LOCATIONS_PROVIDER == "overpass":
+        return await _find_overpass_locations(lat, lng, radius_miles, intent, limit)
+    raise UpstreamServiceError("Location provider configuration is invalid.")

@@ -191,10 +191,10 @@ See [docs/MCP_SETUP.md](docs/MCP_SETUP.md) for client configuration and example 
 Scout includes a Vercel deployment configuration:
 
 - `vercel.json` builds the TypeScript frontend, serves `public`, redirects `/` to `/index.html`, and routes `/api/*` to FastAPI.
-- `api/index.py` exposes the FastAPI app as the ASGI entrypoint.
+- `app.py` exposes the FastAPI app as the native ASGI entrypoint.
 - `.vercelignore` excludes local secrets, virtualenvs, node modules, and test output.
 
-The app does not require API keys for its default data sources.
+The app does not require API keys for its default data sources: OpenStreetMap places via [Photon by Komoot](https://github.com/komoot/photon), plus Open-Meteo weather. Photon supports nearby category queries, with missing access and opening details explicitly left unknown. See deployment docs for reasonable-use limits and the optional legacy Overpass backend.
 
 See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for deployment commands and smoke checks.
 

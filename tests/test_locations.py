@@ -124,7 +124,7 @@ def test_live_search_expands_empty_results_and_combines_intent_tags(monkeypatch)
 
     monkeypatch.setattr(locations, "_fetch_overpass_json", fetch)
     monkeypatch.setattr(locations.config, "OVERPASS_BASE_URLS", ("https://example.test/api",))
-    result = asyncio.run(locations.find_locations(23.5791, 58.4026, 15, "somewhere nice"))
+    result = asyncio.run(locations._find_overpass_locations(23.5791, 58.4026, 15, "somewhere nice"))
     assert result[0].osm_id == 42
     assert len(queries) == 3
     assert all('"tourism"="viewpoint"' in q and '"leisure"="park"' in q for q in queries)
@@ -149,7 +149,7 @@ def test_live_search_fails_over_after_provider_timeout(monkeypatch) -> None:
     monkeypatch.setattr(locations.httpx, "AsyncClient",
                         lambda **kwargs: client_class(transport=httpx.MockTransport(respond), **kwargs))
     monkeypatch.setattr(locations.config, "OVERPASS_BASE_URLS", ("https://slow.test/api", "https://healthy.test/api"))
-    result = asyncio.run(locations.find_locations(23.5791, 58.4026, 15, "somewhere nice"))
+    result = asyncio.run(locations._find_overpass_locations(23.5791, 58.4026, 15, "somewhere nice"))
     assert result[0].osm_id == 99
     assert [r.url.host for r in calls] == ["slow.test", "healthy.test"]
     assert calls[1].method == "POST"
@@ -168,7 +168,7 @@ def test_live_search_deadline_bounds_hanging_provider(monkeypatch) -> None:
     monkeypatch.setattr(locations, "_fetch_overpass_json", hanging_fetch)
     monkeypatch.setattr(locations.config, "OVERPASS_SEARCH_TIMEOUT_SECONDS", 0.01)
     with pytest.raises(UpstreamServiceError):
-        asyncio.run(locations.find_locations(23.5791, 58.4026, 15, "somewhere nice"))
+        asyncio.run(locations._find_overpass_locations(23.5791, 58.4026, 15, "somewhere nice"))
 
 
 def test_unavailable_endpoints_are_not_retried_at_each_radius(monkeypatch) -> None:
@@ -186,5 +186,5 @@ def test_unavailable_endpoints_are_not_retried_at_each_radius(monkeypatch) -> No
     monkeypatch.setattr(locations, "_fetch_overpass_json", unavailable)
     monkeypatch.setattr(locations.config, "OVERPASS_BASE_URLS", ("https://first.test", "https://second.test"))
     with pytest.raises(UpstreamServiceError):
-        asyncio.run(locations.find_locations(23.5791, 58.4026, 15, "somewhere nice"))
+        asyncio.run(locations._find_overpass_locations(23.5791, 58.4026, 15, "somewhere nice"))
     assert endpoints == ["https://first.test", "https://second.test"]
