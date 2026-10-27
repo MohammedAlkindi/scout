@@ -107,3 +107,65 @@ def test_candidates_keep_constraint_tags() -> None:
     assert (viewpoint.fee, viewpoint.opening_hours, viewpoint.wheelchair) == (False, None, None)
     assert museum.indoor is True
     assert viewpoint.indoor is False
+
+
+def test_live_search_expands_empty_results_and_combines_intent_tags(monkeypatch) -> None:
+    import asyncio
+    from server.services import locations
+
+    queries = []
+
+    async def fetch(client, endpoint, query):
+        queries.append(query)
+        if len(queries) < 3:
+            return {"elements": []}
+        return {"elements": [{"id": 42, "lat": 23.60, "lon": 58.40,
+                              "tags": {"name": "Live mapped park", "leisure": "park"}}]}
+
+    monkeypatch.setattr(locations, "_fetch_overpass_json", fetch)
+    monkeypatch.setattr(locations.config, "OVERPASS_BASE_URLS", ("https://example.test/api",))
+    result = asyncio.run(locations.find_locations(23.5791, 58.4026, 15, "somewhere nice"))
+    assert result[0].osm_id == 42
+    assert len(queries) == 3
+    assert all('"tourism"="viewpoint"' in q and '"leisure"="park"' in q for q in queries)
+    assert 'around:12874.752' in queries[-1]
+
+
+def test_live_search_fails_over_after_provider_timeout(monkeypatch) -> None:
+    import asyncio
+    import httpx
+    from server.services import locations
+
+    calls = []
+
+    def respond(request):
+        calls.append(request)
+        if request.url.host == "slow.test":
+            raise httpx.ReadTimeout("slow upstream", request=request)
+        return httpx.Response(200, json={"elements": [{"id": 99, "lat": 23.58, "lon": 58.40,
+                                     "tags": {"name": "Mapped viewpoint", "tourism": "viewpoint"}}]})
+
+    client_class = httpx.AsyncClient
+    monkeypatch.setattr(locations.httpx, "AsyncClient",
+                        lambda **kwargs: client_class(transport=httpx.MockTransport(respond), **kwargs))
+    monkeypatch.setattr(locations.config, "OVERPASS_BASE_URLS", ("https://slow.test/api", "https://healthy.test/api"))
+    result = asyncio.run(locations.find_locations(23.5791, 58.4026, 15, "somewhere nice"))
+    assert result[0].osm_id == 99
+    assert [r.url.host for r in calls] == ["slow.test", "healthy.test"]
+    assert calls[1].method == "POST"
+    assert "github.com/MohammedAlkindi/scout" in calls[1].headers["User-Agent"]
+
+
+def test_live_search_deadline_bounds_hanging_provider(monkeypatch) -> None:
+    import asyncio
+    import pytest
+    from server.services import locations
+    from server.errors import UpstreamServiceError
+
+    async def hanging_fetch(*args):
+        await asyncio.sleep(60)
+
+    monkeypatch.setattr(locations, "_fetch_overpass_json", hanging_fetch)
+    monkeypatch.setattr(locations.config, "OVERPASS_SEARCH_TIMEOUT_SECONDS", 0.01)
+    with pytest.raises(UpstreamServiceError):
+        asyncio.run(locations.find_locations(23.5791, 58.4026, 15, "somewhere nice"))

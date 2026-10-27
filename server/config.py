@@ -34,7 +34,7 @@ def _env_csv(name: str, default: tuple[str, ...]) -> tuple[str, ...]:
 
 
 OPEN_METEO_BASE_URL = os.environ.get("OPEN_METEO_BASE_URL", "https://api.open-meteo.com/v1/forecast")
-OVERPASS_BASE_URL = os.environ.get("OVERPASS_BASE_URL", "https://overpass-api.de/api/interpreter")
+OVERPASS_BASE_URL = os.environ.get("OVERPASS_BASE_URL", "https://overpass.private.coffee/api/interpreter")
 OVERPASS_BASE_URLS = _env_csv(
     "OVERPASS_BASE_URLS",
     (
@@ -44,12 +44,13 @@ OVERPASS_BASE_URLS = _env_csv(
 )
 
 # Overpass blocks requests without a descriptive User-Agent.
-HTTP_USER_AGENT = os.environ.get("SCOUT_HTTP_USER_AGENT", "Scout/1.0 (photography recommendation tool)")
+HTTP_USER_AGENT = os.environ.get("SCOUT_HTTP_USER_AGENT", "Scout/1.0 (https://github.com/MohammedAlkindi/scout)")
 
 HTTP_TIMEOUT_SECONDS = _env_float("SCOUT_HTTP_TIMEOUT_SECONDS", 12.0)
-OVERPASS_HTTP_TIMEOUT_SECONDS = _env_float("SCOUT_OVERPASS_HTTP_TIMEOUT_SECONDS", 3.0)
-OVERPASS_QUERY_TIMEOUT_SECONDS = _env_int("SCOUT_OVERPASS_QUERY_TIMEOUT_SECONDS", 3)
-OVERPASS_MAX_ATTEMPTS = _env_int("SCOUT_OVERPASS_MAX_ATTEMPTS", 2)
+OVERPASS_HTTP_TIMEOUT_SECONDS = _env_float("SCOUT_OVERPASS_HTTP_TIMEOUT_SECONDS", 20.0)
+OVERPASS_QUERY_TIMEOUT_SECONDS = _env_int("SCOUT_OVERPASS_QUERY_TIMEOUT_SECONDS", 15)
+OVERPASS_MAX_ATTEMPTS = _env_int("SCOUT_OVERPASS_MAX_ATTEMPTS", 8)
+OVERPASS_SEARCH_TIMEOUT_SECONDS = _env_float("SCOUT_OVERPASS_SEARCH_TIMEOUT_SECONDS", 45.0)
 OVERPASS_RATE_LIMIT_COOLDOWN_SECONDS = _env_float("SCOUT_OVERPASS_RATE_LIMIT_COOLDOWN_SECONDS", 60.0)
 
 # Current conditions drift within minutes; geography does not.

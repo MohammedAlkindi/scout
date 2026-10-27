@@ -14,6 +14,7 @@ Overpass rejects requests without a descriptive User-Agent header.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import math
 from dataclasses import dataclass
@@ -448,58 +449,69 @@ async def find_locations(
 
     attempt_count = 0
     exhausted_attempts = False
+    deadline = monotonic() + config.OVERPASS_SEARCH_TIMEOUT_SECONDS
 
     async with httpx.AsyncClient(timeout=config.OVERPASS_HTTP_TIMEOUT_SECONDS) as client:
         for search_radius_miles in _search_radii(radius_miles):
-            for tag_group in _tag_groups(tags):
-                radius_meters = search_radius_miles * 1609.344
-                query = _build_overpass_query(lat, lng, radius_meters, tag_group)
-                for endpoint_index, endpoint in enumerate(config.OVERPASS_BASE_URLS):
-                    if _endpoint_is_cooling_down(endpoint):
-                        last_rate_limit_error = RateLimitedError(_LOCATION_RATE_LIMIT_MESSAGE)
-                        continue
+            # Query all narrow intent tags together so empty tag groups cannot
+            # consume the request budget before the radius expands.
+            tag_group = tags
+            radius_meters = search_radius_miles * 1609.344
+            query = _build_overpass_query(lat, lng, radius_meters, tag_group)
+            for endpoint_index, endpoint in enumerate(config.OVERPASS_BASE_URLS):
+                if _endpoint_is_cooling_down(endpoint):
+                    last_rate_limit_error = RateLimitedError(_LOCATION_RATE_LIMIT_MESSAGE)
+                    continue
 
-                    if attempt_count >= config.OVERPASS_MAX_ATTEMPTS:
-                        exhausted_attempts = True
-                        break
+                remaining = deadline - monotonic()
+                if attempt_count >= config.OVERPASS_MAX_ATTEMPTS or remaining <= 0:
+                    if successful_queries == 0 and last_upstream_error is None:
+                        last_upstream_error = UpstreamServiceError(_LOCATION_UNAVAILABLE_MESSAGE)
+                    exhausted_attempts = True
+                    break
 
-                    attempt_count += 1
-                    try:
+                attempt_count += 1
+                client.timeout = httpx.Timeout(min(config.OVERPASS_HTTP_TIMEOUT_SECONDS, remaining))
+                try:
+                    async with asyncio.timeout(remaining):
                         data = await _fetch_overpass_json(client, endpoint, query)
-                    except RateLimitedError as exc:
-                        last_rate_limit_error = exc
-                        logger.warning(
-                            "OSM candidate query rate-limited radius_miles=%.1f tag_count=%s endpoint_index=%s",
-                            search_radius_miles,
-                            len(tag_group),
-                            endpoint_index,
-                        )
-                        continue
-                    except UpstreamServiceError as exc:
-                        last_upstream_error = exc
-                        logger.warning(
-                            "OSM candidate query failed radius_miles=%.1f tag_count=%s endpoint_index=%s",
-                            search_radius_miles,
-                            len(tag_group),
-                            endpoint_index,
-                        )
-                        continue
-
-                    successful_queries += 1
-                    candidates = _candidates_from_elements(lat, lng, data.get("elements", []))
-                    if candidates:
-                        logger.info(
-                            "Found %s OSM candidates radius_miles=%.1f tag_count=%s",
-                            len(candidates),
-                            search_radius_miles,
-                            len(tag_group),
-                        )
-                        return candidates[:limit]
-
+                except TimeoutError:
+                    record_upstream_call("overpass", "timeout", round(remaining * 1000))
+                    last_upstream_error = UpstreamServiceError(_LOCATION_UNAVAILABLE_MESSAGE)
+                    exhausted_attempts = True
                     break
+                except RateLimitedError as exc:
+                    last_rate_limit_error = exc
+                    logger.warning(
+                        "OSM candidate query rate-limited radius_miles=%.1f tag_count=%s endpoint_index=%s",
+                        search_radius_miles,
+                        len(tag_group),
+                        endpoint_index,
+                    )
+                    continue
+                except UpstreamServiceError as exc:
+                    last_upstream_error = exc
+                    logger.warning(
+                        "OSM candidate query failed radius_miles=%.1f tag_count=%s endpoint_index=%s",
+                        search_radius_miles,
+                        len(tag_group),
+                        endpoint_index,
+                    )
+                    continue
 
-                if exhausted_attempts:
-                    break
+                successful_queries += 1
+                candidates = _candidates_from_elements(lat, lng, data.get("elements", []))
+                if candidates:
+                    logger.info(
+                        "Found %s OSM candidates radius_miles=%.1f tag_count=%s",
+                        len(candidates),
+                        search_radius_miles,
+                        len(tag_group),
+                    )
+                    return candidates[:limit]
+
+                break
+
             if exhausted_attempts:
                 break
 

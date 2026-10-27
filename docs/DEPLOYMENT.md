@@ -55,9 +55,10 @@ Optional environment variables:
 | `OPEN_METEO_BASE_URL` | Override weather provider endpoint. |
 | `OVERPASS_BASE_URL` | Override Overpass endpoint. |
 | `OVERPASS_BASE_URLS` | Optional comma-separated Overpass-compatible endpoint list for failover. Defaults to the primary Overpass endpoint plus a tested Overpass-compatible mirror. |
-| `SCOUT_OVERPASS_QUERY_TIMEOUT_SECONDS` | Overpass query timeout embedded in the Overpass query. Defaults to `3`. |
-| `SCOUT_OVERPASS_HTTP_TIMEOUT_SECONDS` | HTTP timeout for each Overpass request. Defaults to `3`. |
-| `SCOUT_OVERPASS_MAX_ATTEMPTS` | Maximum focused Overpass attempts per location search. Defaults to `2`. |
+| `SCOUT_OVERPASS_QUERY_TIMEOUT_SECONDS` | Overpass query timeout embedded in the Overpass query. Defaults to `15`. |
+| `SCOUT_OVERPASS_HTTP_TIMEOUT_SECONDS` | HTTP timeout for each Overpass request. Defaults to `20`. |
+| `SCOUT_OVERPASS_MAX_ATTEMPTS` | Maximum focused Overpass attempts per location search. Defaults to `8`. |
+| `SCOUT_OVERPASS_SEARCH_TIMEOUT_SECONDS` | Overall location-search request budget; defaults to `45` seconds. |
 | `SCOUT_OVERPASS_RATE_LIMIT_COOLDOWN_SECONDS` | In-process cooldown after an Overpass `429`. Defaults to `60`. |
 | `SCOUT_HTTP_USER_AGENT` | User-Agent sent to Overpass. |
 | `SCOUT_HTTP_TIMEOUT_SECONDS` | Outbound HTTP timeout. |
@@ -152,3 +153,7 @@ Demo session is missing
 : Clear local storage or use the New Scout flow once. The frontend now ensures
 the bundled `Try Muscat sunset scout` session exists on app startup without
 creating duplicates.
+
+### Live-provider resilience
+
+Scout uses [Private.coffee Overpass](https://overpass.private.coffee/) as its default map endpoint, with the VK Maps mirror as sequential failover. Requests identify the project, cache map results for 24 hours, and respect cooldowns. Query execution gets 15 seconds and HTTP transport 20 seconds, within a 45-second search budget. All narrow intent tags share a query so successful empty searches can expand through the requested radius rather than exhausting attempts on individual tags. The bundled Muscat fallback remains explicitly labeled during genuine outages. Weather continues to use Open-Meteo.
