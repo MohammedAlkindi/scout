@@ -4,7 +4,7 @@
 .pytest_cache/
 .coverage
 node_modules/
-public/assets/
+# Keep generated public/assets available for Vercel's static asset collection.
 playwright-report/
 test-results/
 __pycache__/
