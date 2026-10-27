@@ -448,6 +448,7 @@ async def find_locations(
     successful_queries = 0
 
     attempt_count = 0
+    failed_endpoints: set[str] = set()
     exhausted_attempts = False
     deadline = monotonic() + config.OVERPASS_SEARCH_TIMEOUT_SECONDS
 
@@ -459,6 +460,8 @@ async def find_locations(
             radius_meters = search_radius_miles * 1609.344
             query = _build_overpass_query(lat, lng, radius_meters, tag_group)
             for endpoint_index, endpoint in enumerate(config.OVERPASS_BASE_URLS):
+                if endpoint in failed_endpoints:
+                    continue
                 if _endpoint_is_cooling_down(endpoint):
                     last_rate_limit_error = RateLimitedError(_LOCATION_RATE_LIMIT_MESSAGE)
                     continue
@@ -490,6 +493,7 @@ async def find_locations(
                     )
                     continue
                 except UpstreamServiceError as exc:
+                    failed_endpoints.add(endpoint)
                     last_upstream_error = exc
                     logger.warning(
                         "OSM candidate query failed radius_miles=%.1f tag_count=%s endpoint_index=%s",

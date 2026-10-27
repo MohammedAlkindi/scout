@@ -169,3 +169,22 @@ def test_live_search_deadline_bounds_hanging_provider(monkeypatch) -> None:
     monkeypatch.setattr(locations.config, "OVERPASS_SEARCH_TIMEOUT_SECONDS", 0.01)
     with pytest.raises(UpstreamServiceError):
         asyncio.run(locations.find_locations(23.5791, 58.4026, 15, "somewhere nice"))
+
+
+def test_unavailable_endpoints_are_not_retried_at_each_radius(monkeypatch) -> None:
+    import asyncio
+    import pytest
+    from server.services import locations
+    from server.errors import UpstreamServiceError
+
+    endpoints = []
+
+    async def unavailable(client, endpoint, query):
+        endpoints.append(endpoint)
+        raise UpstreamServiceError("provider unavailable")
+
+    monkeypatch.setattr(locations, "_fetch_overpass_json", unavailable)
+    monkeypatch.setattr(locations.config, "OVERPASS_BASE_URLS", ("https://first.test", "https://second.test"))
+    with pytest.raises(UpstreamServiceError):
+        asyncio.run(locations.find_locations(23.5791, 58.4026, 15, "somewhere nice"))
+    assert endpoints == ["https://first.test", "https://second.test"]
