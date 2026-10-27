@@ -143,38 +143,6 @@ function inferInitialActivity(session, settings) {
     const preferredActivity = ACTIVITY_OPTIONS.find((activity) => activity.shotType === preferred);
     return preferredActivity ?? defaultActivity();
 }
-function renderStarterWorkspace(root, onPickActivity) {
-    const workspace = document.createElement("section");
-    workspace.className = "starter-workspace";
-    const eyebrow = document.createElement("p");
-    eyebrow.className = "label";
-    eyebrow.textContent = "Ready to scout";
-    const title = document.createElement("h1");
-    title.textContent = "Choose the kind of scout you need.";
-    const body = document.createElement("p");
-    body.textContent =
-        "Scout turns a selected activity into a focused location search, then ranks places against light, weather, distance, and access.";
-    const grid = document.createElement("div");
-    grid.className = "starter-grid";
-    for (const starter of ACTIVITY_OPTIONS.filter((activity) => activity.featured)) {
-        const button = document.createElement("button");
-        button.className = "starter-card";
-        button.type = "button";
-        button.addEventListener("click", () => {
-            onPickActivity(starter);
-        });
-        const cardLabel = document.createElement("span");
-        cardLabel.className = "starter-card__label";
-        cardLabel.textContent = starter.label;
-        const cardPrompt = document.createElement("span");
-        cardPrompt.className = "starter-card__prompt";
-        cardPrompt.textContent = starter.description;
-        button.append(cardLabel, cardPrompt);
-        grid.appendChild(button);
-    }
-    workspace.append(eyebrow, title, body, grid);
-    root.appendChild(workspace);
-}
 export function renderIntentInput(root, session, settings, handlers) {
     let selectedActivity = inferInitialActivity(session, settings);
     let isSubmitting = false;
@@ -211,7 +179,50 @@ export function renderIntentInput(root, session, settings, handlers) {
     activityGrid.className = "activity-grid";
     activityGrid.setAttribute("role", "list");
     activityField.append(activityLabel, activitySearch, activityGrid);
-    fields.append(locationField, activityField);
+    const change = document.createElement("button");
+    change.type = "button";
+    change.className = "text-button";
+    change.textContent = "Change origin";
+    change.addEventListener("click", handlers.onChangeLocation);
+    const locationGroup = document.createElement("div");
+    locationGroup.className = "field";
+    locationGroup.append(locationField, change);
+    const radiusField = document.createElement("label");
+    radiusField.className = "field";
+    radiusField.textContent = "Search radius (mi)";
+    const radius = document.createElement("input");
+    radius.type = "number";
+    radius.name = "radius";
+    radius.className = "input";
+    radius.min = "1";
+    radius.max = "50";
+    radius.required = true;
+    radius.value = String(session.searchRadiusMiles ?? settings.radiusMiles);
+    radiusField.append(radius);
+    const styleField = document.createElement("label");
+    styleField.className = "field";
+    styleField.textContent = "Prioritize";
+    const style = document.createElement("select");
+    style.name = "travel-style";
+    style.className = "input";
+    for (const [value, label] of [
+        ["photographer", "Photography"],
+        ["sightseeing", "Sightseeing"],
+        ["family", "Family outing"],
+        ["budget", "Low cost"],
+        ["accessible", "Easier access"],
+    ]) {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = label;
+        style.append(option);
+    }
+    style.value = session.travelStyle ?? "photographer";
+    styleField.append(style);
+    const priorities = document.createElement("div");
+    priorities.className = "priority-fields";
+    priorities.append(radiusField, styleField);
+    fields.append(locationGroup, activityField, priorities);
     const controls = document.createElement("div");
     controls.className = "field composer__actions";
     const selectedSummary = document.createElement("p");
@@ -280,13 +291,21 @@ export function renderIntentInput(root, session, settings, handlers) {
         if (!query) {
             return true;
         }
-        const haystack = [activity.label, activity.description, activity.intent, ...activity.keywords].join(" ").toLowerCase();
+        const haystack = [
+            activity.label,
+            activity.description,
+            activity.intent,
+            ...activity.keywords,
+        ]
+            .join(" ")
+            .toLowerCase();
         return haystack.includes(query);
     }
     function renderActivities() {
         const query = activitySearch.value.trim().toLowerCase();
         const matches = ACTIVITY_OPTIONS.filter((activity) => matchesActivity(activity, query));
-        if (query && !matches.some((activity) => activity.id === selectedActivity.id)) {
+        if (query &&
+            !matches.some((activity) => activity.id === selectedActivity.id)) {
             const firstMatch = matches[0];
             if (firstMatch !== undefined) {
                 selectedActivity = firstMatch;
@@ -315,20 +334,35 @@ export function renderIntentInput(root, session, settings, handlers) {
         if (matches.length === 0) {
             const empty = document.createElement("p");
             empty.className = "activity-picker__empty";
-            empty.textContent = "No activity match. Try portrait, sunset, hiking, wildlife, urban, or beach.";
+            empty.textContent =
+                "No activity match. Try portrait, sunset, hiking, wildlife, urban, or beach.";
             activityGrid.appendChild(empty);
         }
-        selectedSummary.textContent = `${selectedActivity.label} / ${selectedActivity.shotType}`;
+        selectedSummary.textContent = `${selectedActivity.label} · Upcoming light windows`;
     }
     activitySearch.addEventListener("input", renderActivities);
     renderActivities();
-    root.append(form, status);
     if (isNewScout) {
-        renderStarterWorkspace(root, (activity) => {
-            selectedActivity = activity;
-            renderActivities();
-            form.scrollIntoView({ block: "center" });
-        });
+        const intro = document.createElement("header");
+        intro.className = "search-intro";
+        const step = document.createElement("p");
+        step.className = "label";
+        step.textContent = "01 / Search brief";
+        const heading = document.createElement("h1");
+        heading.textContent = "What are you planning?";
+        const copy = document.createElement("p");
+        copy.textContent =
+            "Choose an activity and what matters to you. Scout compares nearby places against upcoming light and weather.";
+        intro.append(step, heading, copy);
+        root.append(intro, form, status);
+    }
+    else {
+        const edit = document.createElement("details");
+        edit.className = "edit-search";
+        const summary = document.createElement("summary");
+        summary.textContent = `Edit search · ${session.location.label} · ${selectedActivity.label}`;
+        edit.append(summary, form, status);
+        root.append(edit);
     }
     function renderSkeleton() {
         const skeleton = document.createElement("section");
@@ -346,23 +380,27 @@ export function renderIntentInput(root, session, settings, handlers) {
         if (isSubmitting) {
             return;
         }
+        if (!form.reportValidity())
+            return;
         isSubmitting = true;
         submit.disabled = true;
         form.setAttribute("aria-busy", "true");
         clearRecovery();
         status.className = "status";
-        status.textContent = "Checking map candidates, light windows, live weather, and access signals.";
+        status.textContent =
+            "Checking map candidates, light windows, live weather, and access signals.";
         const skeleton = renderSkeleton();
         root.appendChild(skeleton);
         handlers
-            .onSubmit(selectedActivity.intent, selectedActivity.shotType)
+            .onSubmit(selectedActivity.intent, selectedActivity.shotType, Number(radius.value), style.value)
             .catch((error) => {
             isSubmitting = false;
             submit.disabled = false;
             form.setAttribute("aria-busy", "false");
             skeleton.remove();
             status.className = "status status--error";
-            status.textContent = "Live scout stopped before recommendations were ready.";
+            status.textContent =
+                "Live scout stopped before recommendations were ready.";
             renderRecovery(error);
         });
     });

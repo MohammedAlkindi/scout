@@ -198,33 +198,35 @@ export function renderLocationGrant(root, handlers) {
     section.className = "location-state";
     const brand = document.createElement("div");
     brand.className = "location-state__brand";
-    const brandTitle = document.createElement("h1");
-    brandTitle.textContent = "Scout";
+    const brandTitle = document.createElement("p");
+    brandTitle.textContent = "A better plan before you go.";
     const brandCopy = document.createElement("p");
-    brandCopy.textContent = "Plan outdoor shots from real light, weather, and place data.";
+    brandCopy.textContent =
+        "Plan outdoor shots from real light, weather, and place data.";
     brand.append(brandTitle, brandCopy);
     const intro = document.createElement("div");
     intro.className = "location-state__intro";
     const eyebrow = document.createElement("p");
     eyebrow.className = "label";
-    eyebrow.textContent = "New scout";
+    eyebrow.textContent = "SCOUT / OUTDOOR PLANNING";
     const title = document.createElement("h1");
-    title.textContent = "Start with a precise field position.";
+    title.textContent = "Find the place. Catch the light.";
     const body = document.createElement("p");
     body.textContent =
-        "Scout uses your origin to evaluate nearby places against light windows, weather, distance, and access friction.";
+        "Compare nearby places with real map data, upcoming light and live weather. Choose a spot, then build a field plan you can take with you.";
     const metrics = document.createElement("div");
     metrics.className = "onboarding-metrics";
-    metrics.append(createMetric("Recommendations", "3"), createMetric("Forecast", "24h"), createMetric("Session store", "local"));
+    metrics.append(createMetric("Recommendations", "3"), createMetric("Forecast", "24h"), createMetric("No account needed", "Private"));
     intro.append(eyebrow, title, body, metrics);
     const panel = document.createElement("div");
     panel.className = "location-panel";
     const panelHeader = document.createElement("div");
     panelHeader.className = "location-panel__header";
     const panelTitle = document.createElement("h2");
-    panelTitle.textContent = "Choose origin";
+    panelTitle.textContent = "Where will you start?";
     const panelCopy = document.createElement("p");
-    panelCopy.textContent = "Pick a destination anchor, use browser location, or enter exact coordinates.";
+    panelCopy.textContent =
+        "Pick a destination anchor, use browser location, or enter exact coordinates.";
     panelHeader.append(panelTitle, panelCopy);
     let selectedDestination = DESTINATIONS[0] ?? {
         kind: "City",
@@ -257,13 +259,22 @@ export function renderLocationGrant(root, handlers) {
     const useDestination = document.createElement("button");
     useDestination.type = "button";
     useDestination.className = "button button--primary";
+    let liveDestinations = [];
+    let liveQuery = "";
+    let searchMessage = "";
+    let searchTimer;
     function selectDestination(destination) {
         selectedDestination = destination;
         renderDestinations();
     }
     function renderDestinations() {
         const query = destinationSearch.value.trim().toLowerCase();
-        const matches = DESTINATIONS.filter((destination) => matchesDestination(destination, query)).sort((left, right) => destinationMatchRank(left, query) - destinationMatchRank(right, query));
+        const local = DESTINATIONS.filter((destination) => matchesDestination(destination, query));
+        const matches = (local.length > 0 || !query
+            ? local
+            : liveQuery === query
+                ? liveDestinations
+                : []).sort((left, right) => destinationMatchRank(left, query) - destinationMatchRank(right, query));
         if (query && !matches.includes(selectedDestination)) {
             selectedDestination = matches[0] ?? selectedDestination;
         }
@@ -293,13 +304,57 @@ export function renderLocationGrant(root, handlers) {
         if (matches.length === 0) {
             const empty = document.createElement("p");
             empty.className = "destination-picker__empty";
-            empty.textContent = "No destination match. Try Muscat, Dubai, Oman, Japan, Yosemite, or lake.";
+            empty.setAttribute("role", "status");
+            empty.textContent =
+                searchMessage ||
+                    (query.length < 3
+                        ? "Type at least 3 characters to search more places."
+                        : "No places found. Try a nearby city or exact coordinates.");
             destinationGrid.appendChild(empty);
         }
-        destinationSummary.textContent = `${destinationLabel(selectedDestination)} / ${selectedDestination.latitude.toFixed(4)}, ${selectedDestination.longitude.toFixed(4)}`;
+        useDestination.disabled = matches.length === 0;
+        destinationSummary.textContent =
+            matches.length === 0
+                ? "Choose a result before continuing."
+                : `${destinationLabel(selectedDestination)} / ${selectedDestination.latitude.toFixed(4)}, ${selectedDestination.longitude.toFixed(4)}`;
         useDestination.textContent = `Scout ${selectedDestination.name}`;
     }
-    destinationSearch.addEventListener("input", renderDestinations);
+    destinationSearch.addEventListener("input", () => {
+        window.clearTimeout(searchTimer);
+        searchMessage = "";
+        renderDestinations();
+        const query = destinationSearch.value.trim().toLowerCase();
+        if (query.length < 3 ||
+            DESTINATIONS.some((destination) => matchesDestination(destination, query)))
+            return;
+        searchMessage = "Searching OpenStreetMap…";
+        renderDestinations();
+        searchTimer = window.setTimeout(() => {
+            void fetch(`/api/destinations?q=${encodeURIComponent(query)}`)
+                .then(async (response) => {
+                if (!response.ok)
+                    throw new Error("Destination search is unavailable. Use exact coordinates or try again.");
+                return (await response.json());
+            })
+                .then((matches) => {
+                if (destinationSearch.value.trim().toLowerCase() !== query ||
+                    !root.isConnected)
+                    return;
+                liveQuery = query;
+                liveDestinations = matches;
+                searchMessage = "";
+                renderDestinations();
+            })
+                .catch(() => {
+                if (destinationSearch.value.trim().toLowerCase() !== query ||
+                    !root.isConnected)
+                    return;
+                searchMessage =
+                    "Destination search is unavailable. Use exact coordinates or try again.";
+                renderDestinations();
+            });
+        }, 450);
+    });
     useDestination.addEventListener("click", () => {
         handlers.onGranted({
             latitude: selectedDestination.latitude,
@@ -356,7 +411,8 @@ export function renderLocationGrant(root, handlers) {
     if (!("geolocation" in navigator)) {
         locate.disabled = true;
         status.className = "status status--error";
-        status.textContent = "This browser cannot access location. Enter coordinates to continue.";
+        status.textContent =
+            "This browser cannot access location. Enter coordinates to continue.";
     }
     locate.addEventListener("click", () => {
         locate.disabled = true;

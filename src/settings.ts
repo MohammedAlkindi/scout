@@ -1,6 +1,13 @@
 import type { Settings } from "./types.js";
 
-const ACTIVITY_TYPES = ["landscape", "portrait", "urban", "wildlife", "hiking", "astro"] as const;
+const ACTIVITY_TYPES = [
+  "landscape",
+  "portrait",
+  "urban",
+  "wildlife",
+  "hiking",
+  "astro",
+] as const;
 
 export interface SettingsPanelOptions {
   panel: HTMLElement;
@@ -18,8 +25,16 @@ function applyTheme(theme: Settings["theme"]): void {
   document.documentElement.dataset.theme = theme;
 }
 
-function setOpen(panel: HTMLElement, overlay: HTMLElement, isOpen: boolean): void {
+function setOpen(
+  panel: HTMLElement,
+  overlay: HTMLElement,
+  isOpen: boolean,
+): void {
   panel.classList.toggle("settings-panel--open", isOpen);
+  if (panel instanceof HTMLDialogElement) {
+    if (isOpen && !panel.open) panel.showModal();
+    else if (!isOpen && panel.open) panel.close();
+  }
   overlay.classList.toggle("settings-overlay--open", isOpen);
   panel.setAttribute("aria-hidden", String(!isOpen));
 }
@@ -63,7 +78,9 @@ export function applySettings(settings: Settings): void {
   applyTheme(settings.theme);
 }
 
-export function initSettingsPanel(options: SettingsPanelOptions): { render: (settings: Settings) => void } {
+export function initSettingsPanel(options: SettingsPanelOptions): {
+  render: (settings: Settings) => void;
+} {
   let current = options.settings;
   let returnFocus: HTMLElement | null = null;
 
@@ -92,9 +109,14 @@ export function initSettingsPanel(options: SettingsPanelOptions): { render: (set
 
     const units = section("Units");
     units.appendChild(
-      renderSegmented(["metric", "imperial"], settings.units, "segmented", (unitsValue) => {
-        update({ ...current, units: unitsValue });
-      }),
+      renderSegmented(
+        ["metric", "imperial"],
+        settings.units,
+        "segmented",
+        (unitsValue) => {
+          update({ ...current, units: unitsValue });
+        },
+      ),
     );
 
     const radius = section("Default search radius");
@@ -121,7 +143,10 @@ export function initSettingsPanel(options: SettingsPanelOptions): { render: (set
     chips.className = "chip-grid";
     for (const activity of ACTIVITY_TYPES) {
       const chip = button(activity, "chip");
-      chip.setAttribute("aria-pressed", String(settings.activityTypes.includes(activity)));
+      chip.setAttribute(
+        "aria-pressed",
+        String(settings.activityTypes.includes(activity)),
+      );
       chip.addEventListener("click", () => {
         const hasActivity = current.activityTypes.includes(activity);
         const activityTypes = hasActivity
@@ -135,27 +160,40 @@ export function initSettingsPanel(options: SettingsPanelOptions): { render: (set
 
     const time = section("Time format");
     time.appendChild(
-      renderSegmented(["12h", "24h"], settings.timeFormat, "segmented", (timeFormat) => {
-        update({ ...current, timeFormat });
-      }),
+      renderSegmented(
+        ["12h", "24h"],
+        settings.timeFormat,
+        "segmented",
+        (timeFormat) => {
+          update({ ...current, timeFormat });
+        },
+      ),
     );
 
     const theme = section("Theme");
     theme.appendChild(
-      renderSegmented(["system", "dark", "light"], settings.theme, "segmented segmented--three", (themeValue) => {
-        update({ ...current, theme: themeValue });
-      }),
+      renderSegmented(
+        ["system", "dark", "light"],
+        settings.theme,
+        "segmented segmented--three",
+        (themeValue) => {
+          update({ ...current, theme: themeValue });
+        },
+      ),
     );
 
     options.panel.append(header, units, radius, activities, time, theme);
   }
 
   function openPanel(): void {
-    returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : options.openButton;
+    returnFocus =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : options.openButton;
     setOpen(options.panel, options.overlay, true);
-    window.setTimeout(() => {
-      options.panel.querySelector<HTMLButtonElement>("[aria-label='Close settings']")?.focus();
-    }, 0);
+    options.panel
+      .querySelector<HTMLButtonElement>("[aria-label='Close settings']")
+      ?.focus();
   }
 
   function closePanel(): void {
@@ -163,10 +201,41 @@ export function initSettingsPanel(options: SettingsPanelOptions): { render: (set
     returnFocus?.focus();
   }
 
+  options.panel.addEventListener("keydown", (event) => {
+    if (
+      event.key !== "Tab" ||
+      options.panel.getAttribute("aria-hidden") === "true"
+    )
+      return;
+    const controls = Array.from(
+      options.panel.querySelectorAll<HTMLElement>(
+        "button, input, select, textarea, a[href], [tabindex]",
+      ),
+    ).filter(
+      (control) => control.tabIndex >= 0 && !control.hasAttribute("disabled"),
+    );
+    const first = controls[0];
+    const last = controls[controls.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last?.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first?.focus();
+    }
+  });
+
   options.openButton.addEventListener("click", openPanel);
   options.overlay.addEventListener("click", closePanel);
+  options.panel.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    closePanel();
+  });
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") {
+    if (
+      event.key === "Escape" &&
+      options.panel.getAttribute("aria-hidden") !== "true"
+    ) {
       closePanel();
     }
   });

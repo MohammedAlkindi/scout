@@ -53,6 +53,7 @@ Optional environment variables:
 | Variable | Purpose |
 | --- | --- |
 | `SCOUT_LOCATIONS_PROVIDER` | `photon` (default) or `overpass` (optional legacy backend). |
+| `PHOTON_SEARCH_BASE_URL` | Origin search endpoint for `/api/destinations`; defaults to `https://photon.komoot.io/api/`. |
 | `PHOTON_BASE_URL` | Photon reverse endpoint; defaults to `https://photon.komoot.io/reverse`. |
 | `SCOUT_PHOTON_TIMEOUT_SECONDS` | Hard deadline and HTTP timeout for a Photon lookup; defaults to `10` seconds. |
 | `OPEN_METEO_BASE_URL` | Override weather provider endpoint. |
@@ -164,3 +165,8 @@ The default backend is [Photon by Komoot](https://github.com/komoot/photon), a k
 Komoot allows reasonable project usage of the public endpoint, without an availability guarantee. Scout keeps the existing map cache (24 hours), outbound rate limits and a 10-second lookup deadline. Do not use this public service for bulk extraction. OpenStreetMap contributors remain credited by the map and the response source note. Photon is an index of OSM, not an observation that a place is currently open.
 
 `SCOUT_LOCATIONS_PROVIDER=overpass` retains the legacy Overpass backend for explicitly configured deployments. Its optional endpoints, retry settings and cooldowns above apply only to that backend. Genuine provider outages retain the explicitly labeled Muscat demo fallback; outside demo-eligible requests the API returns structured errors.
+
+
+## Planning-release smoke checks
+
+Search for a destination outside the built-in anchors (for example Tampa), then run a live scout. Confirm `/api/destinations` returns real coordinates and recommendations identify Photon/Open-Meteo without demo fallback. Change radius and priority through Edit search. Choose a place, edit notes/checklist, reload, and check persistence. Download both field brief and calendar; the latter must use UTC timestamps and escaped/folded iCalendar text. Shared result links must exclude private notes. At phone width, verify dialogs close with Escape, focus returns, comparison table scrolls inside its own region, and page width fits the viewport.

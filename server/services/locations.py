@@ -18,6 +18,7 @@ from typing import Optional
 import httpx
 
 from server import config
+from server.cache import TTLCache
 from server.errors import NoCandidatesFoundError, RateLimitedError, UpstreamServiceError
 from server.observability import record_upstream_call
 from server.rate_limiter import TokenBucket
@@ -610,3 +611,58 @@ async def find_locations(lat: float, lng: float, radius_miles: float, intent: st
     if config.LOCATIONS_PROVIDER == "overpass":
         return await _find_overpass_locations(lat, lng, radius_miles, intent, limit)
     raise UpstreamServiceError("Location provider configuration is invalid.")
+
+
+_destination_cache: TTLCache[list[dict]] = TTLCache()
+
+
+async def search_destinations(query: str) -> list[dict]:
+    """Resolve a named origin with Photon; cache and rate-limit public lookups."""
+    query = query.strip()
+    if len(query) < 2 or len(query) > 120:
+        from server.errors import InvalidRequestError
+        raise InvalidRequestError("Enter between 2 and 120 characters for a destination.")
+
+    async def fetch() -> list[dict]:
+        await _rate_limiter.acquire()
+        started = perf_counter()
+        try:
+            async with asyncio.timeout(config.PHOTON_TIMEOUT_SECONDS):
+                async with httpx.AsyncClient(timeout=config.PHOTON_TIMEOUT_SECONDS) as client:
+                    response = await client.get(config.PHOTON_SEARCH_BASE_URL,
+                        params={"q": query, "limit": 6, "lang": "en"}, headers={"User-Agent": config.HTTP_USER_AGENT})
+                    response.raise_for_status()
+                    data = response.json()
+            if not isinstance(data, dict) or not isinstance(data.get("features"), list):
+                raise ValueError("expected feature collection")
+            results = []
+            for feature in data["features"]:
+                if not isinstance(feature, dict):
+                    continue
+                props, geometry = feature.get("properties", {}), feature.get("geometry", {})
+                if not isinstance(props, dict) or not isinstance(geometry, dict) or geometry.get("type") != "Point":
+                    continue
+                coords = geometry.get("coordinates")
+                name = props.get("name")
+                if not isinstance(name, str) or not name.strip() or not isinstance(coords, list) or len(coords) != 2:
+                    continue
+                if any(isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v) for v in coords):
+                    continue
+                lng, lat = coords
+                if not (-90 <= lat <= 90 and -180 <= lng <= 180):
+                    continue
+                region = ", ".join(dict.fromkeys(v for v in [props.get("city"), props.get("state"), props.get("country")] if isinstance(v, str) and v != name))
+                results.append({"name": name, "region": region, "latitude": lat, "longitude": lng,
+                    "kind": "City" if props.get("osm_value") in ("city", "town", "village") else "Place",
+                    "description": "OpenStreetMap search result", "tags": [], "featured": False})
+            record_upstream_call("photon_search", "success", round((perf_counter() - started) * 1000), response.status_code)
+            return results[:6]
+        except httpx.HTTPStatusError as exc:
+            record_upstream_call("photon_search", "http_error", round((perf_counter() - started) * 1000), exc.response.status_code)
+            if exc.response.status_code == 429:
+                raise RateLimitedError(_LOCATION_RATE_LIMIT_MESSAGE) from exc
+            raise UpstreamServiceError("Destination search is unavailable. Use exact coordinates or try again.") from exc
+        except (httpx.HTTPError, TimeoutError, ValueError) as exc:
+            record_upstream_call("photon_search", "error", round((perf_counter() - started) * 1000))
+            raise UpstreamServiceError("Destination search is unavailable. Use exact coordinates or try again.") from exc
+    return await _destination_cache.get_or_fetch(query.casefold(), config.LOCATIONS_CACHE_TTL_SECONDS, fetch)

@@ -2,42 +2,76 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
     <title>Scout - find your light</title>
     <meta
       name="description"
       content="Location-aware photography and outdoor activity recommendations, grounded in live conditions."
     />
     <meta name="color-scheme" content="light dark" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <meta name="theme-color" content="#f4f6f2" />
     <link
-      href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;700&display=swap"
-      rel="stylesheet"
+      rel="preload"
+      href="fonts/dm-sans-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
     />
     <link rel="icon" type="image/svg+xml" href="logo.svg" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
+    <a class="skip-link" href="#main-content">Skip to workspace</a>
     <div class="app-shell">
       <aside class="sidebar" id="sidebar" aria-label="Scout sessions">
         <div class="sidebar__top">
-          <button class="icon-button hamburger" id="sidebar-toggle" type="button" aria-label="Toggle sessions">+</button>
+          <button
+            class="icon-button mobile-close"
+            id="nav-close"
+            type="button"
+            aria-label="Close sessions"
+          >
+            ×
+          </button>
           <div class="sidebar__brand"><img src="logo.svg" alt="" /> Scout</div>
         </div>
-        <button class="sidebar__new" id="new-session" type="button"><span>+</span> New Scout</button>
+        <button class="sidebar__new" id="new-session" type="button">
+          <span>+</span> New Scout
+        </button>
         <nav class="sidebar__nav" aria-label="Scout workspace">
-          <button class="sidebar__nav-item sidebar__nav-item--active" id="nav-sessions" type="button"><span>?</span> Sessions</button>
-          <button class="sidebar__nav-item" id="nav-conditions" type="button"><span>#</span> Conditions</button>
-          <button class="sidebar__nav-item" id="nav-preferences" type="button"><span>*</span> Preferences</button>
+          <button
+            class="sidebar__nav-item sidebar__nav-item--active"
+            id="nav-sessions"
+            type="button"
+          >
+            <span aria-hidden="true">01</span> Sessions
+          </button>
+          <button class="sidebar__nav-item" id="nav-conditions" type="button">
+            <span aria-hidden="true">02</span> Conditions
+          </button>
+          <button class="sidebar__nav-item" id="nav-preferences" type="button">
+            <span aria-hidden="true">03</span> Preferences
+          </button>
         </nav>
         <label class="sidebar__search">
           <span>Search</span>
-          <input id="session-search" type="search" placeholder="Search scouts" />
+          <input
+            id="session-search"
+            type="search"
+            placeholder="Search scouts"
+          />
         </label>
         <div class="sidebar__section-label">Recent</div>
         <div class="sidebar__sessions" id="session-list"></div>
-        <button class="sidebar__profile" id="settings-open" type="button" aria-label="Open settings">
+        <button
+          class="sidebar__profile"
+          id="settings-open"
+          type="button"
+          aria-label="Open settings"
+        >
           <div class="sidebar__avatar"><img src="logo.svg" alt="" /></div>
           <div>
             <div class="sidebar__profile-name">Scout</div>
@@ -48,15 +82,33 @@
 
       <main class="main">
         <header class="topbar">
+          <button
+            class="icon-button hamburger"
+            id="sidebar-toggle"
+            type="button"
+            aria-label="Open sessions"
+            aria-controls="mobile-nav"
+            aria-expanded="false"
+          >
+            ☰
+          </button>
           <div class="topbar__title" id="active-session-title">New Scout</div>
           <div class="topbar__actions"></div>
         </header>
-        <section class="content" id="main-content" aria-live="polite"></section>
+        <section class="content" id="main-content" tabindex="-1"></section>
       </main>
     </div>
 
+    <dialog id="mobile-nav" aria-label="Scout sessions"></dialog>
     <div class="settings-overlay" id="settings-overlay"></div>
-    <aside class="settings-panel" id="settings-panel" aria-label="Settings" aria-hidden="true" role="dialog" aria-modal="true"></aside>
+    <dialog
+      class="settings-panel"
+      id="settings-panel"
+      aria-label="Settings"
+      aria-hidden="true"
+      role="dialog"
+      aria-modal="true"
+    ></dialog>
 
     <script type="module" src="/assets/main.js"></script>
   </body>

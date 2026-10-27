@@ -17,7 +17,7 @@ from datetime import date as date_type, datetime
 from pathlib import Path
 from typing import Optional
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -156,6 +156,22 @@ async def health() -> dict[str, str]:
 @app.get("/api/diagnostics")
 async def diagnostics() -> dict[str, object]:
     return telemetry.snapshot()
+
+
+class DestinationResult(BaseModel):
+    name: str
+    region: str
+    latitude: float
+    longitude: float
+    kind: str
+    description: str
+    tags: list[str]
+    featured: bool
+
+
+@app.get("/api/destinations", response_model=list[DestinationResult], dependencies=[_rate_limited])
+async def destination_route(q: str = Query(min_length=2, max_length=120)) -> list[dict]:
+    return await orchestration.locations_service.search_destinations(q)
 
 
 @app.get("/api/golden-hour", response_model=GoldenHourResponse, dependencies=[_rate_limited])

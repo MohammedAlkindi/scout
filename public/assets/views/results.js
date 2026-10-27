@@ -1,8 +1,17 @@
+import { placeKey, readFieldPlan, renderFieldPlan } from "./fieldPlan.js";
 import { formatLightPhase } from "../format.js";
 import { buildShareUrl } from "../share.js";
 const timeFormatters = {
-    "12h": new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit", hour12: true }),
-    "24h": new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit", hour12: false }),
+    "12h": new Intl.DateTimeFormat(undefined, {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+    }),
+    "24h": new Intl.DateTimeFormat(undefined, {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+    }),
 };
 function formatTimeWindow(startUtc, endUtc, settings) {
     const formatter = timeFormatters[settings.timeFormat];
@@ -27,7 +36,7 @@ function isNumber(value) {
     return typeof value === "number" && Number.isFinite(value);
 }
 function isStringArray(value) {
-    return Array.isArray(value) && value.every((item) => typeof item === "string");
+    return (Array.isArray(value) && value.every((item) => typeof item === "string"));
 }
 function isScoreBreakdown(value) {
     if (typeof value !== "object" || value === null) {
@@ -55,78 +64,22 @@ function safeStringList(value) {
     return isStringArray(value) ? value : [];
 }
 function confidenceLabel(item) {
-    if (item.confidence === "high" || item.confidence === "medium" || item.confidence === "low") {
+    if (item.confidence === "high" ||
+        item.confidence === "medium" ||
+        item.confidence === "low") {
         return item.confidence;
     }
     return "medium";
 }
-function escapeSvgText(value) {
-    return value
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;");
-}
-function phaseGradientClass(item) {
-    if (item.light_phase === "golden_hour") {
-        return "place-photo place-photo--golden";
-    }
-    if (item.light_phase === "blue_hour") {
-        return "place-photo place-photo--blue";
-    }
-    return "place-photo place-photo--neutral";
-}
-function buildPlaceImage(item) {
-    const imageUrl = item.image_url;
-    if (typeof imageUrl === "string" && imageUrl.trim().length > 0) {
-        const realImage = document.createElement("img");
-        realImage.className = "place-photo place-photo--real";
-        realImage.alt = `${item.location_name} location photo`;
-        realImage.loading = "lazy";
-        realImage.referrerPolicy = "no-referrer";
-        realImage.src = imageUrl;
-        return realImage;
-    }
-    const title = escapeSvgText(item.location_name);
-    const terrain = escapeSvgText(item.terrain_type);
-    const phase = escapeSvgText(formatLightPhase(item.light_phase));
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 520">
-    <defs>
-      <linearGradient id="sky" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0" stop-color="#f7efd9"/>
-        <stop offset="0.48" stop-color="#d9c49a"/>
-        <stop offset="1" stop-color="#191b16"/>
-      </linearGradient>
-      <linearGradient id="ground" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stop-color="#383a32"/>
-        <stop offset="1" stop-color="#191b16"/>
-      </linearGradient>
-      <filter id="grain">
-        <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" stitchTiles="stitch"/>
-        <feColorMatrix type="saturate" values="0"/>
-        <feComponentTransfer><feFuncA type="table" tableValues="0 0.09"/></feComponentTransfer>
-      </filter>
-    </defs>
-    <rect width="900" height="520" fill="url(#sky)"/>
-    <circle cx="686" cy="142" r="52" fill="#f7efd9" opacity="0.82"/>
-    <path d="M0 326 C160 278 282 312 420 268 C560 224 690 270 900 218 V520 H0Z" fill="url(#ground)" opacity="0.96"/>
-    <path d="M0 382 C130 348 254 362 396 330 C548 296 676 330 900 286 V520 H0Z" fill="#25271f" opacity="0.88"/>
-    <rect x="34" y="34" width="832" height="452" rx="16" fill="none" stroke="#f7efd9" stroke-opacity="0.28" stroke-width="2"/>
-    <text x="56" y="72" fill="#f7efd9" font-family="system-ui, sans-serif" font-size="18" font-weight="700" letter-spacing="4">${phase}</text>
-    <text x="56" y="410" fill="#f7efd9" font-family="system-ui, sans-serif" font-size="38" font-weight="700">${title}</text>
-    <text x="56" y="448" fill="#d9c49a" font-family="ui-monospace, monospace" font-size="19">${terrain}</text>
-    <rect width="900" height="520" filter="url(#grain)"/>
-  </svg>`;
-    const image = document.createElement("img");
-    image.className = phaseGradientClass(item);
-    image.alt = `${item.location_name} visual scouting preview`;
-    image.loading = "lazy";
-    image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
-    return image;
-}
 function buildBounds(response) {
-    const latitudes = [response.latitude, ...response.recommendations.map((item) => item.latitude)];
-    const longitudes = [response.longitude, ...response.recommendations.map((item) => item.longitude)];
+    const latitudes = [
+        response.latitude,
+        ...response.recommendations.map((item) => item.latitude),
+    ];
+    const longitudes = [
+        response.longitude,
+        ...response.recommendations.map((item) => item.longitude),
+    ];
     const minLat = Math.min(...latitudes);
     const maxLat = Math.max(...latitudes);
     const minLng = Math.min(...longitudes);
@@ -155,15 +108,6 @@ function buildOverviewMapUrl(bounds) {
     const bbox = `${bounds.west},${bounds.south},${bounds.east},${bounds.north}`;
     return `https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(bbox)}&layer=mapnik`;
 }
-function buildMapUrl(item) {
-    const padding = 0.012;
-    const west = item.longitude - padding;
-    const east = item.longitude + padding;
-    const south = item.latitude - padding;
-    const north = item.latitude + padding;
-    const bbox = `${west},${south},${east},${north}`;
-    return `https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(bbox)}&layer=mapnik&marker=${encodeURIComponent(`${item.latitude},${item.longitude}`)}`;
-}
 function buildOverviewMap(response, settings) {
     const section = document.createElement("section");
     section.className = "results-map";
@@ -173,10 +117,11 @@ function buildOverviewMap(response, settings) {
     const eyebrow = document.createElement("p");
     eyebrow.className = "label";
     eyebrow.textContent = "Map view";
-    const title = document.createElement("h1");
-    title.textContent = "Recommended scouting route";
+    const title = document.createElement("h2");
+    title.textContent = "Your nearby shortlist";
     const body = document.createElement("p");
-    body.textContent = "Ranked pins show where Scout would go first, with cards below for timing and condition details.";
+    body.textContent =
+        "Compare the places around your origin. Distances are straight-line estimates, not a driving route.";
     text.append(eyebrow, title, body);
     const openMap = document.createElement("a");
     openMap.className = "button";
@@ -233,36 +178,20 @@ function buildMedia(item) {
     media.className = "result-card__media";
     const photoWrap = document.createElement("figure");
     photoWrap.className = "media-panel media-panel--photo";
-    const image = buildPlaceImage(item);
+    const image = document.createElement("img");
+    image.src = item.image_url ?? "";
+    image.alt = `${item.location_name} location photo`;
+    image.loading = "lazy";
+    image.width = 640;
+    image.height = 360;
     const caption = document.createElement("figcaption");
     caption.textContent =
-        typeof item.image_attribution === "string" && item.image_attribution.trim().length > 0
+        typeof item.image_attribution === "string" &&
+            item.image_attribution.trim().length > 0
             ? item.image_attribution
             : "Visual scouting preview";
     photoWrap.append(image, caption);
-    const mapWrap = document.createElement("div");
-    mapWrap.className = "media-panel media-panel--map";
-    const map = document.createElement("iframe");
-    map.title = `${item.location_name} map`;
-    map.loading = "lazy";
-    map.referrerPolicy = "no-referrer-when-downgrade";
-    map.src = buildMapUrl(item);
-    const mapLink = document.createElement("a");
-    mapLink.href = `https://www.openstreetmap.org/?mlat=${item.latitude}&mlon=${item.longitude}#map=15/${item.latitude}/${item.longitude}`;
-    mapLink.target = "_blank";
-    mapLink.rel = "noreferrer";
-    mapLink.textContent = "Open map";
-    const directionsLink = document.createElement("a");
-    directionsLink.className = "map-link-secondary";
-    directionsLink.href = `https://www.openstreetmap.org/directions?to=${item.latitude}%2C${item.longitude}`;
-    directionsLink.target = "_blank";
-    directionsLink.rel = "noreferrer";
-    directionsLink.textContent = "Directions";
-    const coordinateLabel = document.createElement("span");
-    coordinateLabel.className = "map-coordinate data";
-    coordinateLabel.textContent = `${item.latitude.toFixed(4)}, ${item.longitude.toFixed(4)}`;
-    mapWrap.append(map, coordinateLabel, mapLink, directionsLink);
-    media.append(photoWrap, mapWrap);
+    media.append(photoWrap);
     return media;
 }
 function tile(label, value) {
@@ -342,14 +271,15 @@ function buildTrustBadges(item, response) {
     const badges = [
         response.demo_mode === true
             ? { label: "Demo plan", detail: "Bundled fallback", tone: "fallback" }
-            : { label: "Live weather", detail: "Open-Meteo", tone: "live" },
+            : {
+                label: Date.now() - new Date(response.generated_at).getTime() > 30 * 60000
+                    ? "Saved weather"
+                    : "Live weather",
+                detail: "Open-Meteo",
+                tone: "live",
+            },
         { label: "Map data", detail: "OpenStreetMap", tone: "live" },
         { label: "Crowd estimate", detail: "Public tags", tone: "estimated" },
-        {
-            label: typeof item.image_url === "string" && item.image_url.trim() ? "Place image" : "Image fallback",
-            detail: typeof item.image_url === "string" && item.image_url.trim() ? "OSM/Wikimedia" : "Generated preview",
-            tone: typeof item.image_url === "string" && item.image_url.trim() ? "live" : "fallback",
-        },
         { label: "Access estimate", detail: "Verify locally", tone: "estimated" },
     ];
     const list = document.createElement("ul");
@@ -367,7 +297,10 @@ function buildTrustBadges(item, response) {
     return list;
 }
 function reportFilename(item) {
-    return `${item.location_name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "scout"}-report.md`;
+    return `${item.location_name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, "") || "scout"}-report.md`;
 }
 function buildReportText(item, response, settings) {
     const reasons = safeStringList(item.reason_tags);
@@ -394,10 +327,14 @@ function buildReportText(item, response, settings) {
         "## Why This Place",
         item.advice,
         "",
-        reasons.length > 0 ? reasons.map((reason) => `- ${reason}`).join("\n") : "- No reason tags available.",
+        reasons.length > 0
+            ? reasons.map((reason) => `- ${reason}`).join("\n")
+            : "- No reason tags available.",
         "",
         "## Verify Before Leaving",
-        caveats.length > 0 ? caveats.map((caveat) => `- ${caveat}`).join("\n") : "- Verify access and conditions locally.",
+        caveats.length > 0
+            ? caveats.map((caveat) => `- ${caveat}`).join("\n")
+            : "- Verify access and conditions locally.",
         "",
         "## Links",
         `- Map: ${mapUrl}`,
@@ -448,7 +385,9 @@ function buildReportActions(item, response, settings) {
         const report = buildReportText(item, response, settings);
         void copyText(report)
             .then((copied) => {
-            status.textContent = copied ? "Copied" : "Copy unavailable. Download instead.";
+            status.textContent = copied
+                ? "Copied"
+                : "Copy unavailable. Download instead.";
         })
             .catch(() => {
             status.textContent = "Copy unavailable. Download instead.";
@@ -466,14 +405,16 @@ function buildReportActions(item, response, settings) {
     return actions;
 }
 function buildSourceNotice(response) {
-    if (typeof response.source_note !== "string" || !response.source_note.trim()) {
+    if (typeof response.source_note !== "string" ||
+        !response.source_note.trim()) {
         return null;
     }
     const notice = document.createElement("section");
     notice.className = "source-notice";
     const label = document.createElement("p");
     label.className = "label";
-    label.textContent = response.demo_mode === true ? "Demo fallback" : "Source status";
+    label.textContent =
+        response.demo_mode === true ? "Demo fallback" : "Source status";
     const body = document.createElement("p");
     body.textContent = response.source_note;
     notice.append(label, body);
@@ -502,7 +443,9 @@ function buildShareActions(response) {
     copy.addEventListener("click", () => {
         void copyText(shareUrl)
             .then((copied) => {
-            status.textContent = copied ? "Share link copied" : "Copy unavailable. Open the link instead.";
+            status.textContent = copied
+                ? "Share link copied"
+                : "Copy unavailable. Open the link instead.";
         })
             .catch(() => {
             status.textContent = "Copy unavailable. Open the link instead.";
@@ -516,7 +459,7 @@ function buildShareActions(response) {
     section.append(text, actions);
     return section;
 }
-function buildCard(item, index, response, settings) {
+function buildCard(item, index, response, settings, onChoose) {
     const card = document.createElement("article");
     card.className = `result-card result-card--${item.light_phase}${index === 0 ? " result-card--primary" : ""}`;
     card.id = `recommendation-${item.rank}`;
@@ -535,7 +478,7 @@ function buildCard(item, index, response, settings) {
     score.className = scoreClass(item.score);
     score.textContent = `${item.score}`;
     top.append(titleBlock, score);
-    const media = buildMedia(item);
+    const media = item.image_url ? buildMedia(item) : null;
     const grid = document.createElement("div");
     grid.className = "result-card__grid";
     grid.append(tile("Best window", formatTimeWindow(item.best_window.start_utc, item.best_window.end_utc, settings)), tile("Distance", formatDistance(item.distance_miles, settings)), tile("Score", `${item.score}/100`));
@@ -548,11 +491,25 @@ function buildCard(item, index, response, settings) {
     const advice = document.createElement("p");
     advice.textContent = item.advice;
     const reportActions = buildReportActions(item, response, settings);
-    card.append(top, media, grid, trustBadges);
+    const choose = document.createElement("button");
+    choose.type = "button";
+    choose.className = "button button--primary choose-place";
+    choose.textContent = "Plan this place";
+    choose.setAttribute("aria-label", `Plan ${item.location_name}`);
+    choose.addEventListener("click", () => onChoose(item));
+    card.append(top);
+    if (media !== null)
+        card.append(media);
+    card.append(grid, trustBadges);
     if (reasonChips !== null) {
         card.appendChild(reasonChips);
     }
-    card.append(breakdown, summary, advice, reportActions);
+    const evidence = document.createElement("details");
+    evidence.className = "score-evidence";
+    const evidenceTitle = document.createElement("summary");
+    evidenceTitle.textContent = "Why this score?";
+    evidence.append(evidenceTitle, breakdown, advice);
+    card.append(summary, evidence, choose, reportActions);
     if (item.permit_required) {
         const permit = document.createElement("p");
         permit.className = "result-card__summary";
@@ -565,7 +522,7 @@ function buildCard(item, index, response, settings) {
     }
     return card;
 }
-export function renderResults(root, response, settings) {
+export function renderResults(root, response, settings, savedPlan, onPlanChange = () => { }, onRefresh = () => { }) {
     if (response.recommendations.length === 0) {
         const empty = document.createElement("section");
         empty.className = "workspace-panel";
@@ -577,28 +534,160 @@ export function renderResults(root, response, settings) {
         root.appendChild(empty);
         return;
     }
-    root.appendChild(buildOverviewMap(response, settings));
+    const header = document.createElement("header");
+    header.className = "results-heading";
+    const step = document.createElement("p");
+    step.className = "label";
+    step.textContent = "02 / Compare";
+    const heading = document.createElement("h1");
+    heading.textContent = "Compare your shortlist";
+    const freshness = document.createElement("p");
+    freshness.className = "muted";
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    freshness.textContent = `${response.recommendations.length} places · Generated ${new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(response.generated_at))} · Times shown in ${zone}. Refresh before leaving.`;
+    header.append(step, heading, freshness);
+    root.append(header);
+    if (Date.now() - new Date(response.generated_at).getTime() > 30 * 60000 ||
+        response.recommendations.every((item) => new Date(item.best_window.end_utc).getTime() < Date.now())) {
+        const warning = document.createElement("section");
+        warning.className = "stale-notice";
+        const text = document.createElement("p");
+        text.textContent =
+            "This is a saved result. Weather or light windows may be out of date; refresh before planning your trip.";
+        const refresh = document.createElement("button");
+        refresh.type = "button";
+        refresh.className = "text-button";
+        refresh.textContent = "Refresh live recommendations";
+        refresh.addEventListener("click", onRefresh);
+        warning.append(text, refresh);
+        root.append(warning);
+    }
     const sourceNotice = buildSourceNotice(response);
-    if (sourceNotice !== null) {
-        root.appendChild(sourceNotice);
+    if (sourceNotice !== null)
+        root.append(sourceNotice);
+    let plan = readFieldPlan(savedPlan);
+    const planSection = document.createElement("section");
+    const choose = (item, focus = true) => {
+        plan = {
+            ...plan,
+            placeKey: placeKey(item),
+            checks: plan.placeKey === placeKey(item) ? plan.checks : [],
+        };
+        let saveError = false;
+        try {
+            onPlanChange(plan);
+        }
+        catch {
+            saveError = true;
+        }
+        renderFieldPlan(planSection, item, response, settings, plan, (next) => {
+            plan = next;
+            onPlanChange(next);
+        });
+        if (saveError)
+            planSection.querySelector("[role=status]").textContent =
+                "Couldn’t save locally. Download your brief to keep a copy.";
+        for (const card of Array.from(root.querySelectorAll(".result-card")))
+            card.classList.toggle("result-card--chosen", card.id === `recommendation-${item.rank}`);
+        if (focus) {
+            planSection.scrollIntoView({ block: "start" });
+            planSection.querySelector("h2")?.focus({ preventScroll: true });
+        }
+    };
+    const comparison = document.createElement("section");
+    comparison.className = "comparison";
+    comparison.setAttribute("aria-label", "Compare places");
+    comparison.tabIndex = 0;
+    const table = document.createElement("table");
+    const caption = document.createElement("caption");
+    caption.textContent = "The trade-offs at a glance";
+    table.append(caption);
+    const head = document.createElement("thead");
+    const headRow = document.createElement("tr");
+    for (const label of [
+        "Place",
+        "Score",
+        "Distance¹",
+        "Light window",
+        "Confidence",
+    ]) {
+        const cell = document.createElement("th");
+        cell.scope = "col";
+        cell.textContent = label;
+        headRow.append(cell);
     }
-    root.appendChild(buildShareActions(response));
-    const top = response.recommendations[0];
-    if (top !== undefined) {
-        const summary = document.createElement("section");
-        summary.className = "results-summary";
-        const title = document.createElement("h1");
-        title.textContent = "Best scouting window found";
-        const body = document.createElement("p");
-        body.textContent = `${top.location_name} leads because it combines ${formatLightPhase(top.light_phase).toLowerCase()} timing, ${formatDistance(top.distance_miles, settings)} travel distance, and a ${top.score}/100 score.`;
-        summary.append(title, body);
-        root.appendChild(summary);
+    head.append(headRow);
+    table.append(head);
+    const body = document.createElement("tbody");
+    for (const item of response.recommendations) {
+        const row = document.createElement("tr");
+        const title = document.createElement("th");
+        title.scope = "row";
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "text-button";
+        button.textContent = item.location_name;
+        button.setAttribute("aria-label", `Choose ${item.location_name}`);
+        button.addEventListener("click", () => choose(item));
+        title.append(button);
+        row.append(title);
+        const score = document.createElement("td");
+        const meter = document.createElement("meter");
+        meter.min = 0;
+        meter.max = 100;
+        meter.value = item.score;
+        meter.setAttribute("aria-label", `${item.location_name} score`);
+        const number = document.createElement("span");
+        number.textContent = ` ${item.score}/100`;
+        score.append(meter, number);
+        row.append(score);
+        for (const text of [
+            formatDistance(item.distance_miles, settings),
+            formatTimeWindow(item.best_window.start_utc, item.best_window.end_utc, settings),
+            confidenceLabel(item),
+        ]) {
+            const cell = document.createElement("td");
+            cell.textContent = text;
+            row.append(cell);
+        }
+        body.append(row);
     }
+    table.append(body);
+    comparison.append(table);
+    root.append(comparison);
+    const footnote = document.createElement("p");
+    footnote.className = "muted small";
+    footnote.textContent =
+        "¹ Straight-line distance. Scores compare these candidates; crowd and access are estimates, not live measurements.";
+    root.append(footnote);
+    if (response.travel_plan) {
+        const priorities = document.createElement("details");
+        priorities.className = "priority-note";
+        const label = document.createElement("summary");
+        label.textContent = "How your priorities affect the ranking";
+        const explanation = document.createElement("p");
+        explanation.textContent = response.travel_plan.explanation;
+        priorities.append(label, explanation);
+        root.append(priorities);
+    }
+    root.append(buildOverviewMap(response, settings));
     const list = document.createElement("section");
     list.className = "results-list";
     list.setAttribute("aria-label", "Scout recommendations");
-    for (const [index, item] of response.recommendations.entries()) {
-        list.appendChild(buildCard(item, index, response, settings));
+    for (const [index, item] of response.recommendations.entries())
+        list.append(buildCard(item, index, response, settings, choose));
+    root.append(list, planSection);
+    const selected = response.recommendations.find((item) => placeKey(item) === plan.placeKey);
+    if (selected)
+        choose(selected, false);
+    else {
+        planSection.className = "plan-empty";
+        const title = document.createElement("h2");
+        title.textContent = "Choose a place to make it yours.";
+        const copy = document.createElement("p");
+        copy.textContent =
+            "Select Plan this place to prepare notes, check access and take your light window with you.";
+        planSection.append(title, copy);
     }
-    root.appendChild(list);
+    root.append(buildShareActions(response));
 }

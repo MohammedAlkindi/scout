@@ -237,3 +237,14 @@ Remaining maturity steps:
 - Add optional provider abstraction for richer place imagery.
 - Add full WCAG audit and snapshot-style visual regression once the UI stabilizes.
 - Add account-backed saved scouts if the product moves beyond local sessions.
+
+
+## Planning workflow
+
+Choose a saved destination anchor, search an OpenStreetMap place, use device location or enter coordinates. Set an activity, radius and planning priority (photography, sightseeing, family, low cost or easier access). Metadata can be missing: those priorities are ranking preferences, not verified accessibility, fee or opening guarantees.
+
+Compare the ranked shortlist by score, straight-line distance, light window and confidence. Choose a place to create a field plan with shoot notes, a preparation checklist, directions, a Markdown brief and an `.ics` light-window event. Times are labeled in the device timezone; calendar exports use UTC. Calendar events reserve the light window, not travel or departure time.
+
+Plans and notes remain in browser storage. They are included in your downloaded brief/calendar but excluded from shared result links. Changing the selected place or refreshing results resets the location-specific checklist and retains shoot notes. Saved results older than 30 minutes display a refresh warning; passed light windows cannot be exported to calendar.
+
+The interface uses self-hosted, OFL-licensed fonts and a map-led layout; it does not generate pretend place photos. Mobile navigation and settings use native dialogs with keyboard focus handling.

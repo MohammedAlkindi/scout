@@ -1,11 +1,16 @@
 import { fetchRecommendation } from "./api.js";
-import { clearShareParamFromUrl, readSharedRecommendationFromUrl } from "./share.js";
+import { clearShareParamFromUrl, readSharedRecommendationFromUrl, } from "./share.js";
 import { applySettings, initSettingsPanel } from "./settings.js";
 import { createSession, createDemoSession, DEMO_SESSION_NAME, deleteSession, duplicateSession, loadSessions, loadSettings, saveSettings, saveSessions, upsertSession, } from "./storage.js";
 import { renderIntentInput } from "./views/intentInput.js";
 import { renderLocationGrant } from "./views/locationGrant.js";
 import { renderResults } from "./views/results.js";
 const LOCATION_PENDING_LABEL = "Location pending";
+function closeNavigation() {
+    const dialog = document.getElementById("mobile-nav");
+    if (dialog?.open)
+        dialog.close();
+}
 function requireElement(id, constructor) {
     const element = document.getElementById(id);
     if (!(element instanceof constructor)) {
@@ -31,7 +36,12 @@ function getElements() {
     };
 }
 function formatSessionTime(iso) {
-    return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(iso));
+    return new Intl.DateTimeFormat(undefined, {
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+    }).format(new Date(iso));
 }
 function activeSession(state) {
     const session = state.sessions.find((candidate) => candidate.id === state.activeSessionId);
@@ -44,10 +54,13 @@ function sessionHasLocation(session) {
     return session.location.label !== LOCATION_PENDING_LABEL;
 }
 function isUntouchedDraft(session) {
-    return !sessionHasLocation(session) && session.intent.trim() === "" && session.results === null;
+    return (!sessionHasLocation(session) &&
+        session.intent.trim() === "" &&
+        session.results === null);
 }
 function isDemoSession(session) {
-    return session.name === DEMO_SESSION_NAME && session.location.label === "Muscat, Oman";
+    return (session.name === DEMO_SESSION_NAME &&
+        session.location.label === "Muscat, Oman");
 }
 function ensureDemoSession(sessions) {
     if (sessions.some(isDemoSession)) {
@@ -109,7 +122,10 @@ function renderSidebar(elements, state, renderApp) {
     elements.sessionList.textContent = "";
     const query = state.sessionQuery.trim().toLowerCase();
     const sessions = query
-        ? state.sessions.filter((session) => [session.name, session.location.label, session.intent].join(" ").toLowerCase().includes(query))
+        ? state.sessions.filter((session) => [session.name, session.location.label, session.intent]
+            .join(" ")
+            .toLowerCase()
+            .includes(query))
         : state.sessions;
     for (const session of sessions) {
         const row = document.createElement("div");
@@ -117,7 +133,7 @@ function renderSidebar(elements, state, renderApp) {
         const activate = () => {
             state.activeSessionId = session.id;
             setActiveNav(elements, state, "sessions");
-            elements.sidebar.classList.remove("sidebar--open");
+            closeNavigation();
             renderApp();
         };
         const selector = document.createElement("button");
@@ -158,6 +174,8 @@ function renderSidebar(elements, state, renderApp) {
                 renderApp();
             }
         }), createMenuButton("Delete", () => {
+            if (!window.confirm(`Delete “${session.name}” from this device?`))
+                return;
             state.sessions = deleteSession(session.id);
             if (state.sessions.length === 0) {
                 const fresh = createSession();
@@ -188,7 +206,11 @@ function renderSidebar(elements, state, renderApp) {
 function renderActiveSession(elements, state, renderApp) {
     const session = activeSession(state);
     elements.activeTitle.textContent =
-        state.activeNav === "conditions" ? "Conditions" : state.activeNav === "preferences" ? "Preferences" : session.name;
+        state.activeNav === "conditions"
+            ? "Conditions"
+            : state.activeNav === "preferences"
+                ? "Preferences"
+                : session.name;
     elements.mainContent.textContent = "";
     const wrapper = document.createElement("div");
     wrapper.className = "session-main";
@@ -207,33 +229,62 @@ function renderActiveSession(elements, state, renderApp) {
                 const nextLocation = {
                     lat: location.latitude,
                     lng: location.longitude,
-                    label: location.label ?? `${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}`,
+                    label: location.label ??
+                        `${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}`,
                 };
-                updateSession(state, { ...session, location: nextLocation, name: defaultSessionName(nextLocation, session.intent) });
+                updateSession(state, {
+                    ...session,
+                    location: nextLocation,
+                    name: defaultSessionName(nextLocation, session.intent),
+                });
                 renderApp();
             },
         });
         return;
     }
     renderIntentInput(wrapper, session, state.settings, {
-        onSubmit: async (intent, shotType) => {
+        onSubmit: async (intent, shotType, radiusMiles, travelStyle) => {
             const request = {
                 latitude: session.location.lat,
                 longitude: session.location.lng,
                 intent,
-                radius_miles: state.settings.radiusMiles,
+                radius_miles: radiusMiles,
+                travel_style: travelStyle,
             };
             if (shotType !== undefined) {
                 request.shot_type = shotType;
             }
             const response = await fetchRecommendation(request);
+            const current = state.sessions.find((candidate) => candidate.id === session.id) ??
+                session;
             const nextSession = {
-                ...session,
+                ...current,
                 intent,
                 results: response,
+                searchRadiusMiles: radiusMiles,
+                travelStyle,
+                fieldPlan: current.fieldPlan
+                    ? { ...current.fieldPlan, placeKey: "", checks: [] }
+                    : undefined,
                 name: defaultSessionName(session.location, intent),
             };
-            updateSession(state, nextSession);
+            state.sessions = upsertSession(nextSession);
+            if (state.activeSessionId !== session.id)
+                return;
+            renderApp();
+            elements.mainContent.scrollTop = 0;
+            elements.mainContent
+                .querySelector(".results-heading h1")
+                ?.focus({ preventScroll: true });
+        },
+        onChangeLocation: () => {
+            const current = state.sessions.find((candidate) => candidate.id === session.id) ??
+                session;
+            updateSession(state, {
+                ...current,
+                location: { ...session.location, label: LOCATION_PENDING_LABEL },
+                results: null,
+            });
             renderApp();
         },
         onUseDemo: () => {
@@ -243,7 +294,10 @@ function renderActiveSession(elements, state, renderApp) {
         },
     });
     if (session.results !== null) {
-        renderResults(wrapper, session.results, state.settings);
+        renderResults(wrapper, session.results, state.settings, session.fieldPlan, (fieldPlan) => {
+            const current = activeSession(state);
+            updateSession(state, { ...current, fieldPlan });
+        }, () => wrapper.querySelector(".composer")?.requestSubmit());
     }
 }
 function renderConditionsView(root, session) {
@@ -283,7 +337,8 @@ function renderPreferencesView(root, settings) {
     const title = document.createElement("h1");
     title.textContent = "Preferences";
     const body = document.createElement("p");
-    body.textContent = "Use the settings drawer from the bottom-left Scout profile to adjust defaults.";
+    body.textContent =
+        "Use the settings drawer from the bottom-left Scout profile to adjust defaults.";
     const grid = document.createElement("div");
     grid.className = "insight-grid";
     const rows = [
@@ -308,11 +363,17 @@ function renderPreferencesView(root, settings) {
     root.appendChild(panel);
 }
 function sharedSessionFromResponse(response) {
-    const name = response.intent.trim() ? `Shared: ${response.intent.trim().slice(0, 36)}` : "Shared scout";
+    const name = response.intent.trim()
+        ? `Shared: ${response.intent.trim().slice(0, 36)}`
+        : "Shared scout";
     return {
         id: crypto.randomUUID(),
         createdAt: response.generated_at,
-        location: { lat: response.latitude, lng: response.longitude, label: "Shared location" },
+        location: {
+            lat: response.latitude,
+            lng: response.longitude,
+            label: "Shared location",
+        },
         intent: response.intent,
         results: response,
         name,
@@ -329,7 +390,9 @@ function main() {
             : sessions
         : [sharedSessionFromResponse(sharedResponse), ...sessions];
     const initialSessions = ensureDemoSession(sessionsWithShare);
-    if (sharedResponse !== null || sessions.length === 0 || initialSessions.length !== sessions.length) {
+    if (sharedResponse !== null ||
+        sessions.length === 0 ||
+        initialSessions.length !== sessions.length) {
         saveSessions(initialSessions);
     }
     if (sharedResponse !== null) {
@@ -337,7 +400,9 @@ function main() {
     }
     const state = {
         sessions: initialSessions,
-        activeSessionId: sharedResponse === null ? firstSession.id : initialSessions[0]?.id ?? firstSession.id,
+        activeSessionId: sharedResponse === null
+            ? firstSession.id
+            : (initialSessions[0]?.id ?? firstSession.id),
         settings: loadSettings(),
         activeNav: "sessions",
         sessionQuery: "",
@@ -352,7 +417,7 @@ function main() {
         if (existingDraft !== undefined) {
             state.activeSessionId = existingDraft.id;
             setActiveNav(elements, state, "sessions");
-            elements.sidebar.classList.remove("sidebar--open");
+            closeNavigation();
             renderApp();
             return;
         }
@@ -376,13 +441,37 @@ function main() {
         elements.settingsOpen.click();
         renderApp();
     });
+    const mobileNav = requireElement("mobile-nav", HTMLDialogElement);
+    const navMedia = window.matchMedia("(max-width: 760px)");
+    const mountNavigation = () => {
+        if (navMedia.matches)
+            mobileNav.append(elements.sidebar);
+        else {
+            closeNavigation();
+            document.querySelector(".app-shell")?.prepend(elements.sidebar);
+        }
+    };
+    navMedia.addEventListener("change", mountNavigation);
+    mountNavigation();
     elements.sidebarToggle.addEventListener("click", () => {
-        elements.sidebar.classList.toggle("sidebar--open");
+        mobileNav.showModal();
+        elements.sidebarToggle.setAttribute("aria-expanded", "true");
+    });
+    mobileNav.addEventListener("close", () => elements.sidebarToggle.setAttribute("aria-expanded", "false"));
+    mobileNav.addEventListener("click", (event) => {
+        if (event.target === mobileNav)
+            closeNavigation();
+    });
+    requireElement("nav-close", HTMLButtonElement).addEventListener("click", closeNavigation);
+    elements.sidebar.addEventListener("click", (event) => {
+        if (event.target.closest(".sidebar__nav-item, #new-session, #settings-open"))
+            closeNavigation();
     });
     elements.sessionSearch.addEventListener("input", () => {
         state.sessionQuery = elements.sessionSearch.value;
         renderSidebar(elements, state, renderApp);
     });
+    elements.settingsOpen.addEventListener("click", closeNavigation);
     initSettingsPanel({
         panel: elements.settingsPanel,
         overlay: elements.settingsOverlay,

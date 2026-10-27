@@ -1,4 +1,11 @@
-const ACTIVITY_TYPES = ["landscape", "portrait", "urban", "wildlife", "hiking", "astro"];
+const ACTIVITY_TYPES = [
+    "landscape",
+    "portrait",
+    "urban",
+    "wildlife",
+    "hiking",
+    "astro",
+];
 function applyTheme(theme) {
     if (theme === "system") {
         document.documentElement.removeAttribute("data-theme");
@@ -8,6 +15,12 @@ function applyTheme(theme) {
 }
 function setOpen(panel, overlay, isOpen) {
     panel.classList.toggle("settings-panel--open", isOpen);
+    if (panel instanceof HTMLDialogElement) {
+        if (isOpen && !panel.open)
+            panel.showModal();
+        else if (!isOpen && panel.open)
+            panel.close();
+    }
     overlay.classList.toggle("settings-overlay--open", isOpen);
     panel.setAttribute("aria-hidden", String(!isOpen));
 }
@@ -113,20 +126,44 @@ export function initSettingsPanel(options) {
         options.panel.append(header, units, radius, activities, time, theme);
     }
     function openPanel() {
-        returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : options.openButton;
+        returnFocus =
+            document.activeElement instanceof HTMLElement
+                ? document.activeElement
+                : options.openButton;
         setOpen(options.panel, options.overlay, true);
-        window.setTimeout(() => {
-            options.panel.querySelector("[aria-label='Close settings']")?.focus();
-        }, 0);
+        options.panel
+            .querySelector("[aria-label='Close settings']")
+            ?.focus();
     }
     function closePanel() {
         setOpen(options.panel, options.overlay, false);
         returnFocus?.focus();
     }
+    options.panel.addEventListener("keydown", (event) => {
+        if (event.key !== "Tab" ||
+            options.panel.getAttribute("aria-hidden") === "true")
+            return;
+        const controls = Array.from(options.panel.querySelectorAll("button, input, select, textarea, a[href], [tabindex]")).filter((control) => control.tabIndex >= 0 && !control.hasAttribute("disabled"));
+        const first = controls[0];
+        const last = controls[controls.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last?.focus();
+        }
+        else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first?.focus();
+        }
+    });
     options.openButton.addEventListener("click", openPanel);
     options.overlay.addEventListener("click", closePanel);
+    options.panel.addEventListener("cancel", (event) => {
+        event.preventDefault();
+        closePanel();
+    });
     document.addEventListener("keydown", (event) => {
-        if (event.key === "Escape") {
+        if (event.key === "Escape" &&
+            options.panel.getAttribute("aria-hidden") !== "true") {
             closePanel();
         }
     });

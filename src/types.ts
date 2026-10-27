@@ -10,9 +10,11 @@
 
 export type LightPhase = "golden_hour" | "blue_hour" | "daylight" | "night";
 
-export type ShotType = "landscape" | "portrait" | "astro" | "wildlife" | "urban" | "hiking";
+export type ShotType =
+  "landscape" | "portrait" | "astro" | "wildlife" | "urban" | "hiking";
 
-export type TravelStyle = "photographer" | "sightseeing" | "family" | "budget" | "accessible";
+export type TravelStyle =
+  "photographer" | "sightseeing" | "family" | "budget" | "accessible";
 
 export type RankingBucketName = "best_overall" | "free" | "rainy_day";
 
@@ -133,6 +135,12 @@ export interface SessionLocation {
   label: string;
 }
 
+export interface FieldPlan {
+  placeKey: string;
+  notes: string;
+  checks: string[];
+}
+
 export interface Session {
   id: string;
   createdAt: string;
@@ -140,6 +148,9 @@ export interface Session {
   intent: string;
   results: RecommendationResponse | null;
   name: string;
+  fieldPlan?: FieldPlan | undefined;
+  searchRadiusMiles?: number;
+  travelStyle?: TravelStyle;
 }
 
 export type Units = "metric" | "imperial";

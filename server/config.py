@@ -36,6 +36,7 @@ def _env_csv(name: str, default: tuple[str, ...]) -> tuple[str, ...]:
 OPEN_METEO_BASE_URL = os.environ.get("OPEN_METEO_BASE_URL", "https://api.open-meteo.com/v1/forecast")
 LOCATIONS_PROVIDER = os.environ.get("SCOUT_LOCATIONS_PROVIDER", "photon")
 PHOTON_BASE_URL = os.environ.get("PHOTON_BASE_URL", "https://photon.komoot.io/reverse")
+PHOTON_SEARCH_BASE_URL = os.environ.get("PHOTON_SEARCH_BASE_URL", "https://photon.komoot.io/api/")
 PHOTON_TIMEOUT_SECONDS = _env_float("SCOUT_PHOTON_TIMEOUT_SECONDS", 10.0)
 
 OVERPASS_BASE_URL = os.environ.get("OVERPASS_BASE_URL", "https://overpass.private.coffee/api/interpreter")
