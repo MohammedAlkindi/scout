@@ -29,7 +29,7 @@ Vercel runs:
 npm ci && npm run build
 ```
 
-The TypeScript compiler writes browser JavaScript into `public/assets/`. The postbuild check verifies the module entrypoint and its imports. The generated directory avoids the generic `dist/` ignore rule; it is rebuilt on Vercel rather than committed.
+The TypeScript compiler writes browser JavaScript into `public/assets/`. These deployable modules are committed because the native backend builder inventories public files before running its custom build. Rebuild and include changed modules with any TypeScript change. The postbuild check verifies the entrypoint and its imports, and CI rejects differences between the shipped modules and compiler output.
 
 ## Routing
 

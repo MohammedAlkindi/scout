@@ -1,5 +1,6 @@
 import { readFile, access } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
+import { execFileSync } from 'node:child_process';
 
 const root = resolve('public');
 const html = await readFile(resolve(root, 'index.html'), 'utf8');
@@ -17,3 +18,6 @@ async function check(file) {
 }
 await check(resolve(root, entry[1].replace(/^\//, '')));
 console.log(`Verified ${visited.size} frontend modules`);
+// The native backend builder inventories public files before the custom build.
+// Keep the deployable modules in Git, and reject stale outputs in CI.
+if (process.env.CI) execFileSync('git', ['diff', '--exit-code', '--', 'public/assets'], { stdio: 'inherit' });
