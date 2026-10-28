@@ -146,18 +146,6 @@ function parseCoordinate(value) {
     const parsed = Number(value.trim());
     return Number.isFinite(parsed) ? parsed : null;
 }
-function createMetric(label, value) {
-    const metric = document.createElement("div");
-    metric.className = "onboarding-metric";
-    const metricValue = document.createElement("span");
-    metricValue.className = "onboarding-metric__value data";
-    metricValue.textContent = value;
-    const metricLabel = document.createElement("span");
-    metricLabel.className = "onboarding-metric__label";
-    metricLabel.textContent = label;
-    metric.append(metricValue, metricLabel);
-    return metric;
-}
 function destinationLabel(destination) {
     return `${destination.name}, ${destination.region}`;
 }
@@ -196,37 +184,23 @@ function destinationMatchRank(destination, query) {
 export function renderLocationGrant(root, handlers) {
     const section = document.createElement("section");
     section.className = "location-state";
-    const brand = document.createElement("div");
-    brand.className = "location-state__brand";
-    const brandTitle = document.createElement("p");
-    brandTitle.textContent = "A better plan before you go.";
-    const brandCopy = document.createElement("p");
-    brandCopy.textContent =
-        "Plan outdoor shots from real light, weather, and place data.";
-    brand.append(brandTitle, brandCopy);
     const intro = document.createElement("div");
     intro.className = "location-state__intro";
-    const eyebrow = document.createElement("p");
-    eyebrow.className = "label";
-    eyebrow.textContent = "SCOUT / OUTDOOR PLANNING";
     const title = document.createElement("h1");
-    title.textContent = "Find the place. Catch the light.";
+    title.textContent = "Plan an outing";
     const body = document.createElement("p");
     body.textContent =
-        "Compare nearby places with real map data, upcoming light and live weather. Choose a spot, then build a field plan you can take with you.";
-    const metrics = document.createElement("div");
-    metrics.className = "onboarding-metrics";
-    metrics.append(createMetric("Recommendations", "3"), createMetric("Forecast", "24h"), createMetric("No account needed", "Private"));
-    intro.append(eyebrow, title, body, metrics);
+        "Choose a starting location to compare nearby places, light and weather.";
+    intro.append(title, body);
     const panel = document.createElement("div");
     panel.className = "location-panel";
     const panelHeader = document.createElement("div");
     panelHeader.className = "location-panel__header";
     const panelTitle = document.createElement("h2");
-    panelTitle.textContent = "Where will you start?";
+    panelTitle.textContent = "Starting location";
     const panelCopy = document.createElement("p");
     panelCopy.textContent =
-        "Pick a destination anchor, use browser location, or enter exact coordinates.";
+        "Search a destination, use your location or enter coordinates.";
     panelHeader.append(panelTitle, panelCopy);
     let selectedDestination = DESTINATIONS[0] ?? {
         kind: "City",
@@ -406,7 +380,7 @@ export function renderLocationGrant(root, handlers) {
     status.className = "status";
     status.setAttribute("role", "status");
     panel.append(panelHeader, destinationPicker, quickActions, divider, actions, status);
-    section.append(brand, intro, panel);
+    section.append(intro, panel);
     root.appendChild(section);
     if (!("geolocation" in navigator)) {
         locate.disabled = true;

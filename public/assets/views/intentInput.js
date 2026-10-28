@@ -347,7 +347,7 @@ export function renderIntentInput(root, session, settings, handlers) {
         intro.className = "search-intro";
         const step = document.createElement("p");
         step.className = "label";
-        step.textContent = "01 / Search brief";
+        step.textContent = "Search brief";
         const heading = document.createElement("h1");
         heading.textContent = "What are you planning?";
         const copy = document.createElement("p");

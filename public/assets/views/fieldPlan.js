@@ -93,7 +93,7 @@ export function renderFieldPlan(root, item, response, settings, initial, onChang
     root.setAttribute("aria-label", "Your field plan");
     const eyebrow = document.createElement("p");
     eyebrow.className = "label";
-    eyebrow.textContent = "03 / Prepare";
+    eyebrow.textContent = "Field plan";
     const heading = document.createElement("h2");
     heading.textContent = "Your field plan";
     heading.tabIndex = -1;

@@ -538,7 +538,7 @@ export function renderResults(root, response, settings, savedPlan, onPlanChange 
     header.className = "results-heading";
     const step = document.createElement("p");
     step.className = "label";
-    step.textContent = "02 / Compare";
+    step.textContent = "Compare places";
     const heading = document.createElement("h1");
     heading.textContent = "Compare your shortlist";
     const freshness = document.createElement("p");
