@@ -1,8 +1,29 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Scout logo">
-  <rect width="64" height="64" rx="14" fill="#172b24"/>
-  <path d="M16 41.5 31.5 14 48 41.5H16Z" fill="#f4f6f2"/>
-  <path d="M25.5 37.5 31.5 26.5 38 37.5h-12.5Z" fill="#9fc0a8"/>
-  <circle cx="32" cy="41.5" r="5.25" fill="#172b24"/>
-  <circle cx="32" cy="41.5" r="2.25" fill="#9fc0a8"/>
-  <path d="M17 48h30" stroke="#9fc0a8" stroke-width="3" stroke-linecap="round"/>
+  <defs>
+    <linearGradient id="scout-sun" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b" />
+      <stop offset="100%" stop-color="#d97706" />
+    </linearGradient>
+    <linearGradient id="scout-frame" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2d3d34" />
+      <stop offset="100%" stop-color="#1b2821" />
+    </linearGradient>
+  </defs>
+  <!-- Background squircle -->
+  <rect width="64" height="64" rx="16" fill="#121815" />
+  
+  <!-- Optical viewfinder target brackets -->
+  <path d="M16 23v-7h7M41 16h7v7M48 41v7h-7M23 48h-7v-7" fill="none" stroke="#3d5246" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+  
+  <!-- Golden hour sun -->
+  <circle cx="32" cy="27" r="7.5" fill="url(#scout-sun)" />
+  
+  <!-- Viewfinder reticle circle -->
+  <circle cx="32" cy="32" r="15" fill="none" stroke="#25352c" stroke-width="1.5" stroke-dasharray="3 3" />
+  
+  <!-- Minimalist horizon & ridge line -->
+  <path d="M15 44.5l10.5-11 8 8 7.5-6.5 8 9.5" fill="none" stroke="#ecf3ed" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" />
+  
+  <!-- Focal lens center pip -->
+  <circle cx="32" cy="27" r="2.5" fill="#121815" />
 </svg>
