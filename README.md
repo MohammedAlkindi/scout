@@ -1,250 +1,158 @@
 # Scout
 
-Scout is a location-aware field planning app for photographers and outdoor
-creators. It turns a current position and a plain-language intent into a ranked
-map of places, timing windows, condition notes, and local verification caveats.
+[![CI](https://github.com/MohammedAlkindi/scout/actions/workflows/ci.yml/badge.svg)](https://github.com/MohammedAlkindi/scout/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-161b22.svg?style=flat-square)](LICENSE)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![MCP](https://img.shields.io/badge/Model_Context_Protocol-Compatible-4B32C3?style=flat-square)](https://modelcontextprotocol.io)
+[![PWA](https://img.shields.io/badge/PWA-Offline_Field_Ready-5A0FC8?style=flat-square&logo=pwa&logoColor=white)](https://web.dev/progressive-web-apps/)
 
-Instead of returning a generic list of popular spots, Scout scores nearby
-OpenStreetMap candidates against sunlight phase, weather, distance, terrain,
-and access signals. The same recommendation engine is exposed through both a
-FastAPI web app and an MCP server.
+Scout is a deterministic solar ephemeris and geospatial multi-criteria ranking engine for outdoor field planning. It turns a current position and a plain-language intent into a ranked map of spots, precise sunlight phase timing, weather viability, and verification caveats — exposed through both a responsive Progressive Web App (PWA) and a Model Context Protocol (MCP) server.
 
-Live demo: [https://scoutphotography.vercel.app](https://scoutphotography.vercel.app)
+Instead of returning a generic list of tourist spots, Scout calculates solar angles deterministically and scores nearby OpenStreetMap candidates against sunlight phase, weather, distance, terrain friction, and access signals.
 
-## What Scout Does
+Live application: [https://scoutphotography.vercel.app](https://scoutphotography.vercel.app)
 
-- Finds nearby candidate locations from OpenStreetMap/Overpass.
-- Starts scouts from current location, exact coordinates, or curated city,
-  country, and place anchors.
-- Calculates sunrise, sunset, golden hour, blue hour, solar noon, and azimuth.
-- Pulls current and hourly weather from Open-Meteo.
-- Scores each place/time window with deterministic service-layer logic.
-- Ranks for an optional travel style (photographer, sightseeing, family, budget,
-  accessible). Each style sets the score weights and hard constraints, and
-  places a constraint removes come back with the reason.
-- Shows a map-first result view with ranked pins, cards, directions, and media previews.
-- Explains each recommendation with score breakdowns, confidence, reason tags, and caveats.
-- Labels each card with trust badges for live, estimated, and fallback signals.
-- Copies or downloads a shareable Markdown scout report for each recommended place.
-- Creates read-only share links that rehydrate a scout result without requiring an account.
-- Provides privacy-safe diagnostics for API, upstream, and recommendation outcomes.
-- Persists local sessions and preferences in the browser.
-- Filters local sessions from the sidebar search.
-- Prevents duplicate untouched sessions when users repeatedly start a new scout.
-- Includes a guaranteed Muscat demo flow for public walkthroughs when live providers are slow.
-- Exposes the same core capabilities as MCP tools for agent workflows.
+---
+
+## Core Capabilities
+
+- **Deterministic Solar Ephemeris**: Calculates sunrise, sunset, golden hour, blue hour, solar noon, and azimuth using a pure Python NOAA formulation with zero external runtime astronomical dependencies.
+- **Multi-Criteria Scoring Engine**: Scores place-time windows against solar elevation, cloud ceiling, visibility, precipitation probability, terrain friction, and crowd estimates.
+- **Dual Runtime Transports**: Exposes identical recommendation logic over FastAPI HTTP endpoints and native Model Context Protocol (MCP) tools for agent orchestration.
+- **Offline-First Field PWA**: Pre-cached service worker architecture (`public/sw.js`) ensures photographers can view their saved shoot timeline, golden-hour chart, and equipment checklist in remote wilderness areas without cellular reception.
+- **Travel Style Constraints**: Ranks for targeted travel styles (photographer, sightseeing, family, budget, accessible) with explicit constraint explanations and rejection telemetry.
+- **Field Plan Export**: Generates portable, self-contained Markdown shoot briefs and RFC 5545 `.ics` calendar events for golden-hour reservations in device-local time with UTC timestamps.
+- **Distributed Edge Cache Support**: In-memory L1 cache with built-in Upstash Redis / Vercel KV REST integration to eliminate upstream API cold-start latency.
+- **Resilient Fallback**: Includes a guaranteed Muscat demo flow for walkthroughs and automated testing when third-party upstream providers are slow.
+
+---
 
 ## Architecture
 
-Scout uses one Python backend and one TypeScript frontend. The important design
-choice is that business logic lives in the service/orchestration layer, not in
-the transport layer.
-
-For a deeper technical walkthrough, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Scout enforces strict separation between transport interfaces and deterministic business orchestration. Transport layers (`server/api.py` and `server/mcp_server.py`) parse and validate inputs before delegating to `server/orchestration.py`.
 
 ```text
-Frontend (TypeScript)
+Frontend (TypeScript PWA)
   public/index.html
   public/styles.css
-  public/dist/*.js
+  public/manifest.json
+  public/sw.js (Service Worker)
+  public/assets/*.js
         |
-        v
-FastAPI HTTP layer
-  server/api.py
-        |
-        v
-Shared orchestration
-  server/orchestration.py
-        |
-        v
-Services
-  server/services/golden_hour.py
-  server/services/weather.py
-  server/services/locations.py
-  server/services/scorer.py
-
-MCP server
-  server/mcp_server.py
-        |
-        v
-Shared orchestration
+        +-----------------------+
+        |                       |
+        v                       v
+FastAPI HTTP layer       MCP Server (stdio)
+  server/api.py            server/mcp_server.py
+        |                       |
+        +-----------+-----------+
+                    |
+                    v
+          Shared Orchestration
+          server/orchestration.py
+                    |
+                    v
+    +---------------+---------------+---------------+
+    |               |               |               |
+    v               v               v               v
+Solar Ephemeris   Weather Core    POI Ingestion   Scorer Engine
+golden_hour.py    weather.py      locations.py    scorer.py
 ```
 
-Both `server/api.py` and `server/mcp_server.py` call
-`server/orchestration.py`, which keeps the MCP and web experiences aligned.
+---
 
 ## MCP Tools
 
+The built-in MCP server (`python -m server.mcp_server`) exposes 5 core tools for AI coding agents and autonomous workflows:
+
 | Tool | Purpose |
 | --- | --- |
-| `get_golden_hour` | Returns sun and light-phase windows for a location and date. |
-| `get_conditions` | Returns current weather and a 24-hour forecast. |
-| `get_locations` | Finds nearby location candidates for a scouting intent. |
-| `score_window` | Scores a location/time window against conditions. |
-| `build_recommendation` | Produces the ranked end-to-end recommendation set, optionally for a travel style. |
+| `get_golden_hour` | Returns sun position and light-phase windows (dawn, sunrise, golden hour, blue hour, sunset, dusk) for a location and date. |
+| `get_conditions` | Returns current weather, atmospheric conditions, and a 24-hour hourly forecast. |
+| `get_locations` | Discovers nearby candidates from OpenStreetMap matching an intent and travel radius. |
+| `score_window` | Computes a deterministic suitability score (0–100) for a place and time window against weather and sunlight. |
+| `build_recommendation` | Executes end-to-end ranking and returns an explainable recommendation set with confidence badges and caveats. |
 
-## Data Sources
+---
 
-- Weather: Open-Meteo, no API key required.
-- Places: OpenStreetMap through Overpass, no API key required.
-- Media: OpenStreetMap image tags and Wikimedia Commons metadata when present.
-- Maps: OpenStreetMap embed and direction links.
+## Data Sources & Resilience
 
-When a real place image is unavailable, the frontend renders a restrained
-generated scouting preview so the layout remains useful without pretending to
-have photographic evidence.
+- **Solar Math**: Deterministic suncalc formulation (mean obliquity, ecliptic coordinates, transit angles). Pure math, zero network calls.
+- **Weather**: Open-Meteo API (temperature, cloud cover, visibility, wind speed, precipitation). Keyless and privacy-preserving.
+- **Places**: OpenStreetMap via [Photon by Komoot](https://photon.komoot.io) and Overpass API.
+- **Caching**: Local in-memory `TTLCache` with per-key concurrency locking, with optional Upstash / Vercel KV REST edge persistence.
 
-## Demo Readiness
-
-The live site includes a bundled `Try Muscat sunset scout` session. It is meant
-to be the reliable public walkthrough path: if live map/weather providers are
-slow during a Muscat-area coastal sunset request, Scout returns a `demo_mode`
-recommendation using static Muscat places plus freshly calculated light
-windows.
-
-For normal user searches, provider failures are not hidden. The API returns
-structured recovery metadata and the frontend shows retry plus demo actions.
-
-## Documentation
-
-| Document | Purpose |
-| --- | --- |
-| [Architecture](docs/ARCHITECTURE.md) | System boundaries, data flow, caching, and extension points. |
-| [API](docs/API.md) | HTTP endpoints, request shapes, response notes, and enums. |
-| [Scoring](docs/SCORING.md) | Recommendation model, weights, confidence, and caveats. |
-| [MCP Setup](docs/MCP_SETUP.md) | Local MCP server setup and example tool prompts. |
-| [Deployment](docs/DEPLOYMENT.md) | Vercel routing, build, environment variables, and verification. |
-| [Development](docs/DEVELOPMENT.md) | Local setup, commands, tests, and contribution workflow. |
-| [Roadmap](docs/ROADMAP.md) | Near-term maturity work and future product directions. |
-
-## Project Layout
-
-```text
-server/
-  api.py                 FastAPI HTTP app and static frontend serving
-  observability.py       Privacy-safe structured telemetry and diagnostics
-  mcp_server.py          MCP tool registration
-  orchestration.py       Shared tool/recommendation flow
-  schemas.py             Pydantic request and response models
-  cache.py               In-memory TTL cache
-  rate_limiter.py        Inbound and outbound rate limiting
-  errors.py              Structured application errors
-  services/
-    golden_hour.py       Sun position and light-window calculations
-    weather.py           Open-Meteo integration
-    locations.py         Overpass/OpenStreetMap integration
-    scorer.py            Deterministic recommendation scoring
-src/
-  main.ts                App bootstrap and view routing
-  types.ts               Shared frontend response types
-  api.ts                 Typed fetch wrapper
-  settings.ts            Preferences panel and theme handling
-  views/                 Location, intent, and results views
-public/
-  index.html
-  styles.css             Design tokens and app UI
-  dist/                  TypeScript output from `npm run build`
-tests/
-  test_golden_hour.py
-  test_scorer.py
-  e2e/
-    scout.spec.ts        Browser smoke/regression tests
-api/
-  index.py               Vercel ASGI entrypoint
-docs/
-  ARCHITECTURE.md        System design and extension points
-  API.md                 HTTP API reference
-  SCORING.md             Recommendation model details
-  MCP_SETUP.md           MCP setup guide
-  DEPLOYMENT.md          Deployment guide
-  DEVELOPMENT.md         Development guide
-  ROADMAP.md             Product and technical roadmap
-.github/workflows/
-  ci.yml                 Python, TypeScript, build, and browser smoke tests
-```
+---
 
 ## Running Locally
 
+### 1. Prerequisites
+- Python 3.12+
+- Node.js 20+
+
+### 2. Setup
 ```bash
+# Clone the repository
+git clone https://github.com/MohammedAlkindi/scout.git
+cd scout
+
+# Python virtual environment
 python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
+# Frontend dependencies and compilation
 npm install
 npm run build
-
-uvicorn server.api:app --reload --port 8420
 ```
 
-Open `http://127.0.0.1:8420/`.
+### 3. Run Web Application
+```bash
+uvicorn server.api:app --reload --port 8420
+```
+Open [http://127.0.0.1:8420](http://127.0.0.1:8420).
 
-To run the MCP server directly:
-
+### 4. Run MCP Server
 ```bash
 python -m server.mcp_server
 ```
+See [docs/MCP_SETUP.md](docs/MCP_SETUP.md) for Claude Desktop, Antigravity, and Cursor configuration.
 
-See [docs/MCP_SETUP.md](docs/MCP_SETUP.md) for client configuration and example prompts.
+---
 
-## Deployment
+## Verification & Testing
 
-Scout includes a Vercel deployment configuration:
-
-- `vercel.json` builds the TypeScript frontend, serves `public`, redirects `/` to `/index.html`, and routes `/api/*` to FastAPI.
-- `app.py` exposes the FastAPI app as the native ASGI entrypoint.
-- `.vercelignore` excludes local secrets, virtualenvs, node modules, and test output.
-
-The app does not require API keys for its default data sources: OpenStreetMap places via [Photon by Komoot](https://github.com/komoot/photon), plus Open-Meteo weather. Photon supports nearby category queries, with missing access and opening details explicitly left unknown. See deployment docs for reasonable-use limits and the optional legacy Overpass backend.
-
-See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for deployment commands and smoke checks.
-
-## Configuration
-
-Scout runs without required secrets. Optional environment variables are defined
-in `server/config.py` for upstream base URLs, timeouts, cache TTLs, and rate
-limits.
-
-Do not commit `.env` files or credentials.
-
-## Verification
+Scout enforces strict automated testing across Python, TypeScript, and browser automation:
 
 ```bash
+# Typecheck TypeScript
 npm run typecheck
+
+# Build frontend modules
 npm run build
+
+# Run unit and integration tests (134 passed)
+pytest -q
+
+# Run end-to-end browser regression tests (Playwright)
 npm run test:e2e
-pytest tests/test_scorer.py tests/test_golden_hour.py tests/test_locations.py tests/test_demo_fallback.py tests/test_observability.py -q
 ```
 
-The Python tests focus on the deterministic core: golden-hour calculations and
-condition scoring, Overpass query shaping, and the bundled demo fallback.
-TypeScript runs in strict mode and the project does not use `any` types.
-Playwright covers the main UI flow, recovery UX, trust badges, export/share
-controls, settings persistence, sidebar search, empty states, visual smoke, and
-a regression for repeated New Scout clicks creating duplicate empty sessions.
+---
 
-GitHub Actions runs the full verification set on pushes to `main` and pull
-requests.
+## Documentation
 
-## Product Status
+- [Architecture & Design Boundaries](docs/ARCHITECTURE.md)
+- [HTTP API Reference](docs/API.md)
+- [Deterministic Scoring Formulation](docs/SCORING.md)
+- [MCP Setup & Example Prompts](docs/MCP_SETUP.md)
+- [Production Deployment](docs/DEPLOYMENT.md)
+- [Development Guidelines](docs/DEVELOPMENT.md)
+- [Product & Technical Roadmap](docs/ROADMAP.md)
 
-Scout is a prototype. The transport layers are thin, scoring is deterministic,
-external API calls are isolated in `server/services/`, CI runs on pushes and
-pull requests, and the frontend is strict TypeScript.
+---
 
-Remaining maturity steps:
+## License
 
-- Export telemetry to a durable hosted sink if traffic grows beyond one process.
-- Add optional provider abstraction for richer place imagery.
-- Add full WCAG audit and snapshot-style visual regression once the UI stabilizes.
-- Add account-backed saved scouts if the product moves beyond local sessions.
-
-
-## Planning workflow
-
-Choose a saved destination anchor, search an OpenStreetMap place, use device location or enter coordinates. Set an activity, radius and planning priority (photography, sightseeing, family, low cost or easier access). Metadata can be missing: those priorities are ranking preferences, not verified accessibility, fee or opening guarantees.
-
-Compare the ranked shortlist by score, straight-line distance, light window and confidence. Choose a place to create a field plan with shoot notes, a preparation checklist, directions, a Markdown brief and an `.ics` light-window event. Times are labeled in the device timezone; calendar exports use UTC. Calendar events reserve the light window, not travel or departure time.
-
-Plans and notes remain in browser storage. They are included in your downloaded brief/calendar but excluded from shared result links. Changing the selected place or refreshing results resets the location-specific checklist and retains shoot notes. Saved results older than 30 minutes display a refresh warning; passed light windows cannot be exported to calendar.
-
-The interface uses self-hosted, OFL-licensed fonts and a map-led layout; it does not generate pretend place photos. Mobile navigation and settings use native dialogs with keyboard focus handling.
+MIT License. See [LICENSE](LICENSE) for details.
