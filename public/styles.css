@@ -1293,11 +1293,19 @@ meter {
   font-weight: 600;
   border: 2px solid var(--surface);
   box-shadow: var(--shadow-md);
-  transition: transform var(--duration-fast) var(--ease-out);
+  transition: transform var(--duration-fast) var(--ease-out),
+              background-color var(--duration-fast) ease,
+              box-shadow var(--duration-fast) ease;
 }
 
-.overview-map__pin:hover {
-  transform: scale(1.15);
+.overview-map__pin:hover,
+.overview-map__pin--highlight {
+  transform: scale(1.28) !important;
+  background: var(--accent) !important;
+  color: var(--accent-text) !important;
+  border-color: var(--surface) !important;
+  box-shadow: 0 0 0 4px var(--accent-soft), var(--shadow-md) !important;
+  z-index: 10;
 }
 
 .route-list {
@@ -1359,6 +1367,47 @@ meter {
 .result-card--chosen {
   border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--accent), var(--shadow-sm);
+}
+
+.result-card--active-pin {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 2px var(--accent), var(--shadow-md) !important;
+  transform: translateY(-2px);
+}
+
+.solar-light-strip {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 9px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-subtle);
+  border: 1px solid var(--border-subtle);
+  font-size: 11px;
+}
+
+.solar-light-strip--golden_hour {
+  background: var(--gold-soft);
+  border-color: rgba(245, 158, 11, 0.25);
+  color: var(--gold);
+}
+
+.solar-light-strip--blue_hour {
+  background: rgba(99, 102, 241, 0.1);
+  border-color: rgba(99, 102, 241, 0.25);
+  color: #818cf8;
+}
+
+.solar-light-strip__icon {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.solar-light-strip__text {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: -0.01em;
+  font-weight: 500;
 }
 
 .result-card__top {
@@ -2159,4 +2208,30 @@ dialog.settings-panel::backdrop {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+@keyframes view-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.location-state,
+.composer,
+.results-heading,
+.results-map,
+.results-list,
+.field-plan,
+.workspace-panel {
+  animation: view-enter 200ms var(--ease-out) backwards;
+}
+
+.results-list > .result-card {
+  animation: view-enter 220ms var(--ease-out) backwards;
+  animation-delay: calc(var(--stagger-index, 0) * 45ms);
 }

@@ -200,6 +200,29 @@ function buildOverviewMap(
     const position = mapPointStyle(item, bounds);
     pin.style.left = position.left;
     pin.style.top = position.top;
+
+    pin.addEventListener("mouseenter", () => {
+      document
+        .getElementById(`recommendation-${item.rank}`)
+        ?.classList.add("result-card--active-pin");
+    });
+    pin.addEventListener("mouseleave", () => {
+      document
+        .getElementById(`recommendation-${item.rank}`)
+        ?.classList.remove("result-card--active-pin");
+    });
+    pin.addEventListener("click", (event) => {
+      event.preventDefault();
+      const card = document.getElementById(`recommendation-${item.rank}`);
+      if (card) {
+        card.scrollIntoView({ behavior: "smooth", block: "center" });
+        card.classList.add("result-card--active-pin");
+        window.setTimeout(() => {
+          card.classList.remove("result-card--active-pin");
+        }, 1500);
+      }
+    });
+
     map.appendChild(pin);
   }
 
@@ -207,6 +230,40 @@ function buildOverviewMap(
   list.className = "route-list";
   for (const item of response.recommendations) {
     const row = document.createElement("li");
+    row.tabIndex = 0;
+    row.style.cursor = "pointer";
+
+    row.addEventListener("mouseenter", () => {
+      document
+        .getElementById(`recommendation-${item.rank}`)
+        ?.classList.add("result-card--active-pin");
+      document
+        .querySelector<HTMLElement>(
+          `.overview-map__pin[href="#recommendation-${item.rank}"]`,
+        )
+        ?.classList.add("overview-map__pin--highlight");
+    });
+    row.addEventListener("mouseleave", () => {
+      document
+        .getElementById(`recommendation-${item.rank}`)
+        ?.classList.remove("result-card--active-pin");
+      document
+        .querySelector<HTMLElement>(
+          `.overview-map__pin[href="#recommendation-${item.rank}"]`,
+        )
+        ?.classList.remove("overview-map__pin--highlight");
+    });
+    row.addEventListener("click", () => {
+      const card = document.getElementById(`recommendation-${item.rank}`);
+      if (card) {
+        card.scrollIntoView({ behavior: "smooth", block: "center" });
+        card.classList.add("result-card--active-pin");
+        window.setTimeout(() => {
+          card.classList.remove("result-card--active-pin");
+        }, 1500);
+      }
+    });
+
     const titleRow = document.createElement("div");
     titleRow.className = "route-list__top";
     const name = document.createElement("strong");
@@ -570,6 +627,31 @@ function buildShareActions(response: RecommendationResponse): HTMLElement {
   return section;
 }
 
+function buildSolarLightStrip(
+  item: RecommendationItem,
+  settings: Settings,
+): HTMLElement {
+  const strip = document.createElement("div");
+  strip.className = `solar-light-strip solar-light-strip--${item.light_phase}`;
+  const icon = document.createElement("span");
+  icon.className = "solar-light-strip__icon";
+  icon.textContent =
+    item.light_phase === "golden_hour"
+      ? "☀"
+      : item.light_phase === "blue_hour"
+        ? "☽"
+        : "☼";
+  const text = document.createElement("span");
+  text.className = "solar-light-strip__text";
+  text.textContent = `${formatLightPhase(item.light_phase)} · ${formatTimeWindow(
+    item.best_window.start_utc,
+    item.best_window.end_utc,
+    settings,
+  )}`;
+  strip.append(icon, text);
+  return strip;
+}
+
 function buildCard(
   item: RecommendationItem,
   index: number,
@@ -637,7 +719,22 @@ function buildCard(
   choose.textContent = "Plan this place";
   choose.setAttribute("aria-label", `Plan ${item.location_name}`);
   choose.addEventListener("click", () => onChoose(item));
-  card.append(top);
+  card.addEventListener("mouseenter", () => {
+    document
+      .querySelector<HTMLElement>(
+        `.overview-map__pin[href="#recommendation-${item.rank}"]`,
+      )
+      ?.classList.add("overview-map__pin--highlight");
+  });
+  card.addEventListener("mouseleave", () => {
+    document
+      .querySelector<HTMLElement>(
+        `.overview-map__pin[href="#recommendation-${item.rank}"]`,
+      )
+      ?.classList.remove("overview-map__pin--highlight");
+  });
+
+  card.append(top, buildSolarLightStrip(item, settings));
   if (media !== null) card.append(media);
   card.append(grid, trustBadges);
   if (reasonChips !== null) {
