@@ -640,8 +640,8 @@ summary:focus-visible,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 34px;
-  padding: 6px 14px;
+  min-height: 35px;
+  padding: 6px 15px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface);
@@ -655,7 +655,10 @@ summary:focus-visible,
   transition: transform var(--duration-fast) var(--ease-out),
               background-color var(--duration-fast) ease,
               border-color var(--duration-fast) ease,
+              box-shadow var(--duration-fast) ease,
               color var(--duration-fast) ease;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -769,11 +772,12 @@ select:focus {
    Step 1: Starting Location State
    ========================================================================== */
 .location-state {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
-  gap: 32px 40px;
-  align-items: start;
-  padding: 12px 0 20px;
+  max-width: 680px;
+  margin: 16px auto 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 0 4px;
 }
 
 .location-state__brand {
@@ -1362,6 +1366,25 @@ meter {
   scroll-margin-top: 20px;
   box-shadow: var(--shadow-sm), var(--inner-highlight);
   transition: border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
+}
+
+
+.result-card--primary {
+  grid-column: 1 / -1;
+  border-color: rgba(255, 255, 255, 0.18);
+  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-subtle) 100%);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25), var(--inner-highlight);
+  position: relative;
+}
+
+.result-card--primary .result-card__name {
+  font-size: 19px;
+  font-weight: 700;
+}
+
+.result-card--primary .choose-place .button {
+  min-height: 38px;
+  font-size: 13px;
 }
 
 .result-card--chosen {
