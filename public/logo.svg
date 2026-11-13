@@ -1,16 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Scout logo">
-  <rect width="64" height="64" rx="16" fill="#090a0f" />
-  <!-- Precision aperture lens & viewfinder reticle (Linear/Leica aesthetic) -->
-  <circle cx="32" cy="32" r="21" fill="none" stroke="#1e232d" stroke-width="1.5" />
-  <circle cx="32" cy="32" r="14" fill="none" stroke="#2a3240" stroke-width="1.5" stroke-dasharray="2 3" />
-  
-  <!-- Optical viewfinder target crosshairs -->
-  <path d="M32 9v6M32 49v6M9 32h6M49 32h6" stroke="#3b4455" stroke-width="1.5" stroke-linecap="round" />
-  
-  <!-- Golden solar core & 45-degree ray projection -->
-  <circle cx="32" cy="32" r="6" fill="#f59e0b" />
-  <path d="M36.2 27.8l9.6-9.6" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" />
-  
-  <!-- Geometric aperture shutter blade forming minimal S-curve -->
-  <path d="M23 32a9 9 0 0 1 9-9h9M41 32a9 9 0 0 1-9 9H23" fill="none" stroke="#e2e8f0" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Scout">
+  <defs>
+    <clipPath id="above-horizon"><rect x="0" y="0" width="64" height="41" /></clipPath>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#161616" />
+  <circle cx="32" cy="41" r="12" fill="none" stroke="#f4f4f4" stroke-width="3" clip-path="url(#above-horizon)" />
+  <path d="M15 46h34" stroke="#f4f4f4" stroke-width="3" stroke-linecap="round" />
 </svg>

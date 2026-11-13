@@ -4,8 +4,8 @@
   "description": "Location-aware outdoor photography and field planning grounded in live sunlight and weather conditions.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0F1713",
-  "theme_color": "#0F1713",
+  "background_color": "#f4f4f4",
+  "theme_color": "#161616",
   "orientation": "portrait-primary",
   "icons": [
     {
