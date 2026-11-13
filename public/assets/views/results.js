@@ -1,4 +1,3 @@
-import { placeKey, readFieldPlan, renderFieldPlan } from "./fieldPlan.js";
 import { formatLightPhase } from "../format.js";
 import { buildShareUrl } from "../share.js";
 const timeFormatters = {
@@ -22,15 +21,6 @@ function formatDistance(miles, settings) {
         return `${(miles * 1.609344).toFixed(1)} km`;
     }
     return `${miles.toFixed(1)} mi`;
-}
-function scoreClass(score) {
-    if (score >= 75) {
-        return "result-card__score result-card__score--high";
-    }
-    if (score >= 50) {
-        return "result-card__score result-card__score--mid";
-    }
-    return "result-card__score result-card__score--low";
 }
 function isNumber(value) {
     return typeof value === "number" && Number.isFinite(value);
@@ -71,6 +61,28 @@ function confidenceLabel(item) {
     }
     return "medium";
 }
+function isStale(response) {
+    return (Date.now() - new Date(response.generated_at).getTime() > 30 * 60000 ||
+        response.recommendations.every((item) => new Date(item.best_window.end_utc).getTime() < Date.now()));
+}
+/** Shown on the shortlist and the plan when the result is old or its windows passed. */
+export function buildStaleNotice(response, onRefresh) {
+    if (!isStale(response))
+        return null;
+    const notice = document.createElement("section");
+    notice.className = "notice";
+    notice.setAttribute("role", "status");
+    const text = document.createElement("p");
+    text.textContent =
+        "This is a saved result. Weather or light windows may be out of date; refresh before planning your trip.";
+    const refresh = document.createElement("button");
+    refresh.type = "button";
+    refresh.className = "button";
+    refresh.textContent = "Refresh live recommendations";
+    refresh.addEventListener("click", onRefresh);
+    notice.append(text, refresh);
+    return notice;
+}
 function buildBounds(response) {
     const latitudes = [
         response.latitude,
@@ -108,30 +120,30 @@ function buildOverviewMapUrl(bounds) {
     const bbox = `${bounds.west},${bounds.south},${bounds.east},${bounds.north}`;
     return `https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(bbox)}&layer=mapnik`;
 }
-function buildOverviewMap(response, settings) {
-    const section = document.createElement("section");
-    section.className = "results-map";
-    const header = document.createElement("div");
-    header.className = "results-map__header";
-    const text = document.createElement("div");
-    const eyebrow = document.createElement("p");
-    eyebrow.className = "label";
-    eyebrow.textContent = "Map view";
-    const title = document.createElement("h2");
-    title.textContent = "Your nearby shortlist";
-    const body = document.createElement("p");
-    body.textContent =
-        "Compare the places around your origin. Distances are straight-line estimates, not a driving route.";
-    text.append(eyebrow, title, body);
-    const openMap = document.createElement("a");
-    openMap.className = "button";
-    openMap.href = `https://www.openstreetmap.org/?mlat=${response.latitude}&mlon=${response.longitude}#map=13/${response.latitude}/${response.longitude}`;
-    openMap.target = "_blank";
-    openMap.rel = "noreferrer";
-    openMap.textContent = "Open map";
-    header.append(text, openMap);
-    const bodyGrid = document.createElement("div");
-    bodyGrid.className = "results-map__body";
+function placeElement(rank) {
+    return document.getElementById(`recommendation-${rank}`);
+}
+function pinElement(rank) {
+    return document.querySelector(`.overview-map__pin[href="#recommendation-${rank}"]`);
+}
+function highlightPlace(rank, on) {
+    placeElement(rank)?.classList.toggle("place--active", on);
+}
+function highlightPin(rank, on) {
+    pinElement(rank)?.classList.toggle("overview-map__pin--active", on);
+}
+function revealPlace(rank) {
+    const card = placeElement(rank);
+    if (card === null)
+        return;
+    card.scrollIntoView({ behavior: "smooth", block: "center" });
+    card.classList.add("place--active");
+    window.setTimeout(() => card.classList.remove("place--active"), 1200);
+}
+function buildMap(response) {
+    const aside = document.createElement("aside");
+    aside.className = "results-map";
+    aside.setAttribute("aria-label", "Map of the shortlist");
     const bounds = buildBounds(response);
     const map = document.createElement("div");
     map.className = "overview-map";
@@ -150,118 +162,52 @@ function buildOverviewMap(response, settings) {
         const position = mapPointStyle(item, bounds);
         pin.style.left = position.left;
         pin.style.top = position.top;
-        pin.addEventListener("mouseenter", () => {
-            document
-                .getElementById(`recommendation-${item.rank}`)
-                ?.classList.add("result-card--active-pin");
-        });
-        pin.addEventListener("mouseleave", () => {
-            document
-                .getElementById(`recommendation-${item.rank}`)
-                ?.classList.remove("result-card--active-pin");
-        });
+        pin.addEventListener("mouseenter", () => highlightPlace(item.rank, true));
+        pin.addEventListener("mouseleave", () => highlightPlace(item.rank, false));
+        pin.addEventListener("focus", () => highlightPlace(item.rank, true));
+        pin.addEventListener("blur", () => highlightPlace(item.rank, false));
         pin.addEventListener("click", (event) => {
             event.preventDefault();
-            const card = document.getElementById(`recommendation-${item.rank}`);
-            if (card) {
-                card.scrollIntoView({ behavior: "smooth", block: "center" });
-                card.classList.add("result-card--active-pin");
-                window.setTimeout(() => {
-                    card.classList.remove("result-card--active-pin");
-                }, 1500);
-            }
+            revealPlace(item.rank);
         });
         map.appendChild(pin);
     }
-    const list = document.createElement("ol");
-    list.className = "route-list";
-    for (const item of response.recommendations) {
-        const row = document.createElement("li");
-        row.tabIndex = 0;
-        row.style.cursor = "pointer";
-        row.addEventListener("mouseenter", () => {
-            document
-                .getElementById(`recommendation-${item.rank}`)
-                ?.classList.add("result-card--active-pin");
-            document
-                .querySelector(`.overview-map__pin[href="#recommendation-${item.rank}"]`)
-                ?.classList.add("overview-map__pin--highlight");
-        });
-        row.addEventListener("mouseleave", () => {
-            document
-                .getElementById(`recommendation-${item.rank}`)
-                ?.classList.remove("result-card--active-pin");
-            document
-                .querySelector(`.overview-map__pin[href="#recommendation-${item.rank}"]`)
-                ?.classList.remove("overview-map__pin--highlight");
-        });
-        row.addEventListener("click", () => {
-            const card = document.getElementById(`recommendation-${item.rank}`);
-            if (card) {
-                card.scrollIntoView({ behavior: "smooth", block: "center" });
-                card.classList.add("result-card--active-pin");
-                window.setTimeout(() => {
-                    card.classList.remove("result-card--active-pin");
-                }, 1500);
-            }
-        });
-        const titleRow = document.createElement("div");
-        titleRow.className = "route-list__top";
-        const name = document.createElement("strong");
-        name.textContent = item.location_name;
-        const score = document.createElement("span");
-        score.className = scoreClass(item.score);
-        score.textContent = `${item.score}`;
-        titleRow.append(name, score);
-        const meta = document.createElement("p");
-        meta.textContent = `${formatDistance(item.distance_miles, settings)} / ${formatTimeWindow(item.best_window.start_utc, item.best_window.end_utc, settings)}`;
-        row.append(titleRow, meta);
-        list.appendChild(row);
-    }
-    bodyGrid.append(map, list);
-    section.append(header, bodyGrid);
-    return section;
+    const openMap = document.createElement("a");
+    openMap.className = "text-link";
+    openMap.href = `https://www.openstreetmap.org/?mlat=${response.latitude}&mlon=${response.longitude}#map=13/${response.latitude}/${response.longitude}`;
+    openMap.target = "_blank";
+    openMap.rel = "noreferrer";
+    openMap.textContent = "Open in OpenStreetMap";
+    const note = document.createElement("p");
+    note.className = "muted small";
+    note.textContent =
+        "Straight-line distances from your origin. Crowd and access are estimates from public map tags, not live measurements.";
+    aside.append(map, openMap, note);
+    return aside;
 }
-function buildMedia(item) {
-    const media = document.createElement("div");
-    media.className = "result-card__media";
-    const photoWrap = document.createElement("figure");
-    photoWrap.className = "media-panel media-panel--photo";
-    const image = document.createElement("img");
-    image.src = item.image_url ?? "";
-    image.alt = `${item.location_name} location photo`;
-    image.loading = "lazy";
-    image.width = 640;
-    image.height = 360;
-    const caption = document.createElement("figcaption");
-    caption.textContent =
-        typeof item.image_attribution === "string" &&
-            item.image_attribution.trim().length > 0
-            ? item.image_attribution
-            : "Visual scouting preview";
-    photoWrap.append(image, caption);
-    media.append(photoWrap);
-    return media;
+function buildLightLine(item, settings) {
+    const line = document.createElement("p");
+    line.className = `place__light place__light--${item.light_phase}`;
+    const dot = document.createElement("span");
+    dot.className = "light-dot";
+    dot.setAttribute("aria-hidden", "true");
+    const phase = document.createElement("span");
+    phase.className = "place__light-phase";
+    phase.textContent = formatLightPhase(item.light_phase);
+    const window = document.createElement("span");
+    window.className = "place__light-window";
+    window.textContent = formatTimeWindow(item.best_window.start_utc, item.best_window.end_utc, settings);
+    line.append(dot, phase, window);
+    return line;
 }
-function tile(label, value) {
-    const element = document.createElement("div");
-    element.className = "data-tile";
-    const tileLabel = document.createElement("span");
-    tileLabel.className = "data-tile__label";
-    tileLabel.textContent = label;
-    const tileValue = document.createElement("span");
-    tileValue.className = "data-tile__value";
-    tileValue.textContent = value;
-    element.append(tileLabel, tileValue);
-    return element;
-}
-function buildReasonChips(item) {
+function buildReasons(item) {
     const tags = safeStringList(item.reason_tags);
     if (tags.length === 0) {
         return null;
     }
     const list = document.createElement("ul");
-    list.className = "reason-chips";
+    list.className = "place__reasons";
+    list.setAttribute("aria-label", "Why it ranks here");
     for (const tag of tags) {
         const chip = document.createElement("li");
         chip.textContent = tag;
@@ -286,11 +232,12 @@ function buildBreakdown(item) {
         rowLabel.textContent = label;
         const track = document.createElement("span");
         track.className = "score-breakdown__track";
+        track.setAttribute("aria-hidden", "true");
         const fill = document.createElement("span");
         fill.className = "score-breakdown__fill";
         fill.style.width = `${Math.max(0, Math.min(100, value))}%`;
         const score = document.createElement("span");
-        score.className = "data";
+        score.className = "score-breakdown__value";
         score.textContent = value.toFixed(0);
         track.appendChild(fill);
         row.append(rowLabel, track, score);
@@ -298,49 +245,32 @@ function buildBreakdown(item) {
     }
     return list;
 }
-function buildCaveats(item) {
-    const caveats = safeStringList(item.caveats);
-    if (caveats.length === 0) {
-        return null;
-    }
-    const details = document.createElement("details");
-    details.className = "caveats";
-    const summary = document.createElement("summary");
-    summary.textContent = "What to verify";
-    const list = document.createElement("ul");
-    for (const caveat of caveats) {
-        const row = document.createElement("li");
-        row.textContent = caveat;
-        list.appendChild(row);
-    }
-    details.append(summary, list);
-    return details;
-}
-function buildTrustBadges(item, response) {
-    const badges = [
+function buildSources(item, response) {
+    const sources = [
         response.demo_mode === true
-            ? { label: "Demo plan", detail: "Bundled fallback", tone: "fallback" }
-            : {
-                label: Date.now() - new Date(response.generated_at).getTime() > 30 * 60000
+            ? ["Demo plan", "bundled fallback"]
+            : [
+                Date.now() - new Date(response.generated_at).getTime() > 30 * 60000
                     ? "Saved weather"
                     : "Live weather",
-                detail: "Open-Meteo",
-                tone: "live",
-            },
-        { label: "Map data", detail: "OpenStreetMap", tone: "live" },
-        { label: "Crowd estimate", detail: "Public tags", tone: "estimated" },
-        { label: "Access estimate", detail: "Verify locally", tone: "estimated" },
+                "Open-Meteo",
+            ],
+        ["Map data", "OpenStreetMap"],
+        ["Crowd estimate", "public tags"],
+        ["Access estimate", "verify locally"],
     ];
     const list = document.createElement("ul");
-    list.className = "trust-badges";
-    for (const badge of badges) {
+    list.className = "place__sources";
+    list.setAttribute("aria-label", `Sources for ${item.location_name}`);
+    for (const [label, detail] of sources) {
         const row = document.createElement("li");
-        row.className = `trust-badge trust-badge--${badge.tone}`;
-        const label = document.createElement("span");
-        label.textContent = badge.label;
-        const detail = document.createElement("small");
-        detail.textContent = badge.detail;
-        row.append(label, detail);
+        const labelElement = document.createElement("span");
+        labelElement.className = "place__source-label";
+        labelElement.textContent = label;
+        const detailElement = document.createElement("span");
+        detailElement.className = "place__source-detail";
+        detailElement.textContent = detail;
+        row.append(labelElement, detailElement);
         list.appendChild(row);
     }
     return list;
@@ -420,39 +350,6 @@ function downloadText(filename, text) {
     link.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
-function buildReportActions(item, response, settings) {
-    const actions = document.createElement("div");
-    actions.className = "report-actions";
-    const status = document.createElement("span");
-    status.className = "report-actions__status";
-    status.setAttribute("role", "status");
-    const copy = document.createElement("button");
-    copy.className = "button";
-    copy.type = "button";
-    copy.textContent = "Copy report";
-    copy.addEventListener("click", () => {
-        const report = buildReportText(item, response, settings);
-        void copyText(report)
-            .then((copied) => {
-            status.textContent = copied
-                ? "Copied"
-                : "Copy unavailable. Download instead.";
-        })
-            .catch(() => {
-            status.textContent = "Copy unavailable. Download instead.";
-        });
-    });
-    const download = document.createElement("button");
-    download.className = "button";
-    download.type = "button";
-    download.textContent = "Download";
-    download.addEventListener("click", () => {
-        downloadText(reportFilename(item), buildReportText(item, response, settings));
-        status.textContent = "Downloaded";
-    });
-    actions.append(copy, download, status);
-    return actions;
-}
 function buildSourceNotice(response) {
     if (typeof response.source_note !== "string" ||
         !response.source_note.trim()) {
@@ -460,8 +357,9 @@ function buildSourceNotice(response) {
     }
     const notice = document.createElement("section");
     notice.className = "source-notice";
-    const label = document.createElement("p");
-    label.className = "label";
+    notice.setAttribute("role", "status");
+    const label = document.createElement("strong");
+    label.className = "source-notice__label";
     label.textContent =
         response.demo_mode === true ? "Demo fallback" : "Source status";
     const body = document.createElement("p");
@@ -469,24 +367,15 @@ function buildSourceNotice(response) {
     notice.append(label, body);
     return notice;
 }
-function buildShareActions(response) {
-    const section = document.createElement("section");
-    section.className = "share-actions";
-    const text = document.createElement("div");
-    const label = document.createElement("p");
-    label.className = "label";
-    label.textContent = "Share";
-    const body = document.createElement("p");
-    body.textContent = "Create a read-only link for this scout result.";
-    text.append(label, body);
-    const actions = document.createElement("div");
-    actions.className = "share-actions__controls";
+function buildShareControls(response) {
+    const controls = document.createElement("div");
+    controls.className = "results-heading__share";
     const status = document.createElement("span");
-    status.className = "report-actions__status";
+    status.className = "status";
     status.setAttribute("role", "status");
     const shareUrl = buildShareUrl(response);
     const copy = document.createElement("button");
-    copy.className = "button button--primary";
+    copy.className = "button";
     copy.type = "button";
     copy.textContent = "Copy share link";
     copy.addEventListener("click", () => {
@@ -501,241 +390,184 @@ function buildShareActions(response) {
         });
     });
     const open = document.createElement("a");
-    open.className = "button";
+    open.className = "text-link";
     open.href = shareUrl;
     open.textContent = "Open share link";
-    actions.append(copy, open, status);
-    section.append(text, actions);
-    return section;
+    controls.append(copy, open, status);
+    return controls;
 }
-function buildSolarLightStrip(item, settings) {
-    const strip = document.createElement("div");
-    strip.className = `solar-light-strip solar-light-strip--${item.light_phase}`;
-    const icon = document.createElement("span");
-    icon.className = "solar-light-strip__icon";
-    icon.textContent =
-        item.light_phase === "golden_hour"
-            ? "☀"
-            : item.light_phase === "blue_hour"
-                ? "☽"
-                : "☼";
-    const text = document.createElement("span");
-    text.className = "solar-light-strip__text";
-    text.textContent = `${formatLightPhase(item.light_phase)} · ${formatTimeWindow(item.best_window.start_utc, item.best_window.end_utc, settings)}`;
-    strip.append(icon, text);
-    return strip;
-}
-function buildCard(item, index, response, settings, onChoose) {
+function buildPlace(item, index, response, settings, chosenKey, handlers) {
+    const row = document.createElement("li");
     const card = document.createElement("article");
-    card.className = `result-card result-card--${item.light_phase}${index === 0 ? " result-card--primary" : ""}`;
+    const chosen = chosenKey === `${item.latitude},${item.longitude}`;
+    card.className = `place${index === 0 ? " place--top" : ""}${chosen ? " place--chosen" : ""}`;
     card.id = `recommendation-${item.rank}`;
-    card.style.setProperty("--stagger-index", String(index));
-    const top = document.createElement("div");
-    top.className = "result-card__top";
-    const titleBlock = document.createElement("div");
+    card.setAttribute("aria-labelledby", `recommendation-${item.rank}-name`);
+    const rank = document.createElement("span");
+    rank.className = "place__rank";
+    rank.textContent = String(item.rank);
+    rank.setAttribute("aria-label", `Rank ${item.rank}`);
+    const body = document.createElement("div");
+    body.className = "place__body";
+    const head = document.createElement("div");
+    head.className = "place__head";
     const name = document.createElement("h2");
-    name.className = "result-card__name";
+    name.className = "place__name";
+    name.id = `recommendation-${item.rank}-name`;
     name.textContent = item.location_name;
+    const score = document.createElement("span");
+    score.className = "place__score";
+    score.setAttribute("aria-label", `Score ${item.score} of 100`);
+    score.textContent = String(item.score);
+    const outOf = document.createElement("small");
+    outOf.textContent = "/100";
+    score.appendChild(outOf);
+    head.append(name, score);
     const meta = document.createElement("p");
-    meta.className = "result-card__meta";
-    meta.textContent = `${item.terrain_type} / ${formatLightPhase(item.light_phase)} / ${confidenceLabel(item)} confidence`;
-    titleBlock.append(name, meta);
-    const score = document.createElement("div");
-    score.className = scoreClass(item.score);
-    score.textContent = `${item.score}`;
-    top.append(titleBlock, score);
-    const media = item.image_url ? buildMedia(item) : null;
-    const grid = document.createElement("div");
-    grid.className = "result-card__grid";
-    grid.append(tile("Best window", formatTimeWindow(item.best_window.start_utc, item.best_window.end_utc, settings)), tile("Distance", formatDistance(item.distance_miles, settings)), tile("Score", `${item.score}/100`));
-    const reasonChips = buildReasonChips(item);
-    const trustBadges = buildTrustBadges(item, response);
-    const breakdown = buildBreakdown(item);
+    meta.className = "place__meta";
+    for (const text of [
+        item.terrain_type,
+        formatDistance(item.distance_miles, settings),
+        `${confidenceLabel(item)} confidence`,
+    ]) {
+        const part = document.createElement("span");
+        part.textContent = text;
+        meta.appendChild(part);
+    }
     const summary = document.createElement("p");
-    summary.className = "result-card__summary";
+    summary.className = "place__summary";
     summary.textContent = item.conditions_summary;
-    const advice = document.createElement("p");
-    advice.textContent = item.advice;
-    const reportActions = buildReportActions(item, response, settings);
+    const actions = document.createElement("div");
+    actions.className = "place__actions";
     const choose = document.createElement("button");
     choose.type = "button";
-    choose.className = "button button--primary choose-place";
-    choose.textContent = "Plan this place";
+    choose.className = `button${index === 0 ? " button--primary" : ""}`;
+    choose.textContent = chosen ? "Open plan" : "Plan this place";
     choose.setAttribute("aria-label", `Plan ${item.location_name}`);
-    choose.addEventListener("click", () => onChoose(item));
-    card.addEventListener("mouseenter", () => {
-        document
-            .querySelector(`.overview-map__pin[href="#recommendation-${item.rank}"]`)
-            ?.classList.add("overview-map__pin--highlight");
+    choose.addEventListener("click", () => handlers.onPlan(item));
+    const reportStatus = document.createElement("span");
+    reportStatus.className = "status";
+    reportStatus.setAttribute("role", "status");
+    const copy = document.createElement("button");
+    copy.className = "button button--ghost";
+    copy.type = "button";
+    copy.textContent = "Copy report";
+    copy.addEventListener("click", () => {
+        void copyText(buildReportText(item, response, settings))
+            .then((copied) => {
+            reportStatus.textContent = copied
+                ? "Copied"
+                : "Copy unavailable. Download instead.";
+        })
+            .catch(() => {
+            reportStatus.textContent = "Copy unavailable. Download instead.";
+        });
     });
-    card.addEventListener("mouseleave", () => {
-        document
-            .querySelector(`.overview-map__pin[href="#recommendation-${item.rank}"]`)
-            ?.classList.remove("overview-map__pin--highlight");
+    const download = document.createElement("button");
+    download.className = "button button--ghost";
+    download.type = "button";
+    download.textContent = "Download";
+    download.setAttribute("aria-label", `Download report for ${item.location_name}`);
+    download.addEventListener("click", () => {
+        downloadText(reportFilename(item), buildReportText(item, response, settings));
+        reportStatus.textContent = "Downloaded";
     });
-    card.append(top, buildSolarLightStrip(item, settings));
-    if (media !== null)
-        card.append(media);
-    card.append(grid, trustBadges);
-    if (reasonChips !== null) {
-        card.appendChild(reasonChips);
-    }
+    actions.append(choose, copy, download, reportStatus);
     const evidence = document.createElement("details");
-    evidence.className = "score-evidence";
+    evidence.className = "place__details";
     const evidenceTitle = document.createElement("summary");
-    evidenceTitle.textContent = "Why this score?";
-    evidence.append(evidenceTitle, breakdown, advice);
-    card.append(summary, evidence, choose, reportActions);
+    evidenceTitle.textContent = "Why this score";
+    const advice = document.createElement("p");
+    advice.textContent = item.advice;
+    evidence.append(evidenceTitle, buildBreakdown(item), advice);
+    const verify = document.createElement("details");
+    verify.className = "place__details";
+    const verifyTitle = document.createElement("summary");
+    verifyTitle.textContent = "What to verify";
+    verify.append(verifyTitle);
     if (item.permit_required) {
         const permit = document.createElement("p");
-        permit.className = "result-card__summary";
         permit.textContent = item.permit_notes ?? "A permit may be required here.";
-        card.appendChild(permit);
+        verify.appendChild(permit);
     }
-    const caveats = buildCaveats(item);
-    if (caveats !== null) {
-        card.appendChild(caveats);
+    const caveats = safeStringList(item.caveats);
+    if (caveats.length > 0) {
+        const list = document.createElement("ul");
+        for (const caveat of caveats) {
+            const entry = document.createElement("li");
+            entry.textContent = caveat;
+            list.appendChild(entry);
+        }
+        verify.appendChild(list);
     }
-    return card;
+    else {
+        const none = document.createElement("p");
+        none.textContent = "Verify access and conditions locally.";
+        verify.appendChild(none);
+    }
+    body.append(head, meta, buildLightLine(item, settings), summary);
+    const reasons = buildReasons(item);
+    if (reasons !== null)
+        body.appendChild(reasons);
+    body.append(actions, evidence, verify, buildSources(item, response));
+    card.addEventListener("mouseenter", () => highlightPin(item.rank, true));
+    card.addEventListener("mouseleave", () => highlightPin(item.rank, false));
+    card.addEventListener("focusin", () => highlightPin(item.rank, true));
+    card.addEventListener("focusout", () => highlightPin(item.rank, false));
+    card.append(rank, body);
+    row.appendChild(card);
+    return row;
 }
-export function renderResults(root, response, settings, savedPlan, onPlanChange = () => { }, onRefresh = () => { }) {
+export function renderResults(root, response, settings, chosenKey, handlers) {
     if (response.recommendations.length === 0) {
         const empty = document.createElement("section");
-        empty.className = "workspace-panel";
+        empty.className = "empty-state";
         const title = document.createElement("h1");
         title.textContent = "No recommendations found";
+        title.tabIndex = -1;
         const body = document.createElement("p");
-        body.textContent = "Try a wider radius or a different activity.";
+        body.className = "lede";
+        body.textContent =
+            "Try a wider radius or a different activity. Open the Brief step to change either.";
         empty.append(title, body);
         root.appendChild(empty);
         return;
     }
     const header = document.createElement("header");
-    header.className = "results-heading";
-    const step = document.createElement("p");
-    step.className = "label";
-    step.textContent = "Compare places";
+    header.className = "view-header results-heading";
+    const text = document.createElement("div");
     const heading = document.createElement("h1");
     heading.textContent = "Compare your shortlist";
+    heading.tabIndex = -1;
     const freshness = document.createElement("p");
-    freshness.className = "muted";
+    freshness.className = "lede";
     const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    freshness.textContent = `${response.recommendations.length} places · Generated ${new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(response.generated_at))} · Times shown in ${zone}. Refresh before leaving.`;
-    header.append(step, heading, freshness);
+    const generated = new Intl.DateTimeFormat(undefined, {
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+    }).format(new Date(response.generated_at));
+    freshness.textContent = `${response.recommendations.length} places for “${response.intent}”, generated ${generated}. Times are in ${zone}.`;
+    text.append(heading, freshness);
+    header.append(text, buildShareControls(response));
     root.append(header);
-    if (Date.now() - new Date(response.generated_at).getTime() > 30 * 60000 ||
-        response.recommendations.every((item) => new Date(item.best_window.end_utc).getTime() < Date.now())) {
-        const warning = document.createElement("section");
-        warning.className = "stale-notice";
-        const text = document.createElement("p");
-        text.textContent =
-            "This is a saved result. Weather or light windows may be out of date; refresh before planning your trip.";
-        const refresh = document.createElement("button");
-        refresh.type = "button";
-        refresh.className = "text-button";
-        refresh.textContent = "Refresh live recommendations";
-        refresh.addEventListener("click", onRefresh);
-        warning.append(text, refresh);
-        root.append(warning);
-    }
+    const stale = buildStaleNotice(response, handlers.onRefresh);
+    if (stale !== null)
+        root.append(stale);
     const sourceNotice = buildSourceNotice(response);
     if (sourceNotice !== null)
         root.append(sourceNotice);
-    let plan = readFieldPlan(savedPlan);
-    const planSection = document.createElement("section");
-    const choose = (item, focus = true) => {
-        plan = {
-            ...plan,
-            placeKey: placeKey(item),
-            checks: plan.placeKey === placeKey(item) ? plan.checks : [],
-        };
-        let saveError = false;
-        try {
-            onPlanChange(plan);
-        }
-        catch {
-            saveError = true;
-        }
-        renderFieldPlan(planSection, item, response, settings, plan, (next) => {
-            plan = next;
-            onPlanChange(next);
-        });
-        if (saveError)
-            planSection.querySelector("[role=status]").textContent =
-                "Couldn’t save locally. Download your brief to keep a copy.";
-        for (const card of Array.from(root.querySelectorAll(".result-card")))
-            card.classList.toggle("result-card--chosen", card.id === `recommendation-${item.rank}`);
-        if (focus) {
-            planSection.scrollIntoView({ block: "start" });
-            planSection.querySelector("h2")?.focus({ preventScroll: true });
-        }
-    };
-    const comparison = document.createElement("section");
-    comparison.className = "comparison";
-    comparison.setAttribute("aria-label", "Compare places");
-    comparison.tabIndex = 0;
-    const table = document.createElement("table");
-    const caption = document.createElement("caption");
-    caption.textContent = "The trade-offs at a glance";
-    table.append(caption);
-    const head = document.createElement("thead");
-    const headRow = document.createElement("tr");
-    for (const label of [
-        "Place",
-        "Score",
-        "Distance¹",
-        "Light window",
-        "Confidence",
-    ]) {
-        const cell = document.createElement("th");
-        cell.scope = "col";
-        cell.textContent = label;
-        headRow.append(cell);
+    const layout = document.createElement("div");
+    layout.className = "shortlist";
+    const list = document.createElement("ol");
+    list.className = "shortlist__list";
+    list.setAttribute("aria-label", "Scout recommendations");
+    for (const [index, item] of response.recommendations.entries()) {
+        list.appendChild(buildPlace(item, index, response, settings, chosenKey, handlers));
     }
-    head.append(headRow);
-    table.append(head);
-    const body = document.createElement("tbody");
-    for (const item of response.recommendations) {
-        const row = document.createElement("tr");
-        const title = document.createElement("th");
-        title.scope = "row";
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "text-button";
-        button.textContent = item.location_name;
-        button.setAttribute("aria-label", `Choose ${item.location_name}`);
-        button.addEventListener("click", () => choose(item));
-        title.append(button);
-        row.append(title);
-        const score = document.createElement("td");
-        const meter = document.createElement("meter");
-        meter.min = 0;
-        meter.max = 100;
-        meter.value = item.score;
-        meter.setAttribute("aria-label", `${item.location_name} score`);
-        const number = document.createElement("span");
-        number.textContent = ` ${item.score}/100`;
-        score.append(meter, number);
-        row.append(score);
-        for (const text of [
-            formatDistance(item.distance_miles, settings),
-            formatTimeWindow(item.best_window.start_utc, item.best_window.end_utc, settings),
-            confidenceLabel(item),
-        ]) {
-            const cell = document.createElement("td");
-            cell.textContent = text;
-            row.append(cell);
-        }
-        body.append(row);
-    }
-    table.append(body);
-    comparison.append(table);
-    root.append(comparison);
-    const footnote = document.createElement("p");
-    footnote.className = "muted small";
-    footnote.textContent =
-        "¹ Straight-line distance. Scores compare these candidates; crowd and access are estimates, not live measurements.";
-    root.append(footnote);
+    layout.append(list, buildMap(response));
+    root.append(layout);
     if (response.travel_plan) {
         const priorities = document.createElement("details");
         priorities.className = "priority-note";
@@ -746,24 +578,4 @@ export function renderResults(root, response, settings, savedPlan, onPlanChange 
         priorities.append(label, explanation);
         root.append(priorities);
     }
-    root.append(buildOverviewMap(response, settings));
-    const list = document.createElement("section");
-    list.className = "results-list";
-    list.setAttribute("aria-label", "Scout recommendations");
-    for (const [index, item] of response.recommendations.entries())
-        list.append(buildCard(item, index, response, settings, choose));
-    root.append(list, planSection);
-    const selected = response.recommendations.find((item) => placeKey(item) === plan.placeKey);
-    if (selected)
-        choose(selected, false);
-    else {
-        planSection.className = "plan-empty";
-        const title = document.createElement("h2");
-        title.textContent = "Choose a place to make it yours.";
-        const copy = document.createElement("p");
-        copy.textContent =
-            "Select Plan this place to prepare notes, check access and take your light window with you.";
-        planSection.append(title, copy);
-    }
-    root.append(buildShareActions(response));
 }

@@ -6,15 +6,16 @@
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover"
     />
-    <title>Scout - find your light</title>
+    <title>Scout</title>
     <meta
       name="description"
       content="Location-aware photography and outdoor activity recommendations, grounded in live conditions."
     />
     <meta name="color-scheme" content="light dark" />
-    <meta name="theme-color" content="#090a0f" />
+    <meta name="theme-color" content="#f4f4f4" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#121212" media="(prefers-color-scheme: dark)" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Scout" />
     <link rel="manifest" href="manifest.json" />
     <link
@@ -28,59 +29,42 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <a class="skip-link" href="#main-content">Skip to workspace</a>
+    <a class="skip-link" href="#main-content">Skip to content</a>
     <div class="app-shell">
       <aside class="sidebar" id="sidebar" aria-label="Scout sessions">
         <div class="sidebar__top">
+          <div class="sidebar__brand">
+            <img src="logo.svg" alt="" width="20" height="20" />
+            <span>Scout</span>
+          </div>
           <button
             class="icon-button mobile-close"
             id="nav-close"
             type="button"
             aria-label="Close sessions"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M3 3l10 10M13 3L3 13" /></svg>
           </button>
-          <div class="sidebar__brand"><img src="logo.svg" alt="" /> Scout</div>
         </div>
-        <button class="sidebar__new" id="new-session" type="button">
-          <span>+</span> New Scout
+        <button class="button button--primary sidebar__new" id="new-session" type="button">
+          New scout
         </button>
-        <nav class="sidebar__nav" aria-label="Scout workspace">
-          <button
-            class="sidebar__nav-item sidebar__nav-item--active"
-            id="nav-sessions"
-            type="button"
-          >
-            Sessions
-          </button>
-          <button class="sidebar__nav-item" id="nav-conditions" type="button">
-            Conditions
-          </button>
-          <button class="sidebar__nav-item" id="nav-preferences" type="button">
-            Preferences
-          </button>
-        </nav>
-        <label class="sidebar__search">
-          <span>Search</span>
-          <input
-            id="session-search"
-            type="search"
-            placeholder="Search scouts"
-          />
-        </label>
-        <div class="sidebar__section-label">Recent</div>
+        <input
+          class="input sidebar__search"
+          id="session-search"
+          type="search"
+          placeholder="Search scouts"
+          aria-label="Search scouts"
+          autocomplete="off"
+        />
         <div class="sidebar__sessions" id="session-list"></div>
         <button
-          class="sidebar__profile"
+          class="sidebar__settings"
           id="settings-open"
           type="button"
           aria-label="Open settings"
         >
-          <div class="sidebar__avatar"><img src="logo.svg" alt="" /></div>
-          <div>
-            <div class="sidebar__profile-name">Scout</div>
-            <div class="sidebar__profile-meta">Field planning</div>
-          </div>
+          Settings
         </button>
       </aside>
 
@@ -94,10 +78,10 @@
             aria-controls="mobile-nav"
             aria-expanded="false"
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M2 4.5h14M2 9h14M2 13.5h14" /></svg>
           </button>
-          <div class="topbar__title" id="active-session-title">New Scout</div>
-          <div class="topbar__actions"></div>
+          <div class="topbar__title" id="active-session-title">New scout</div>
+          <nav class="steps" id="steps" aria-label="Steps"></nav>
         </header>
         <section class="content" id="main-content" tabindex="-1"></section>
       </main>
@@ -110,8 +94,6 @@
       id="settings-panel"
       aria-label="Settings"
       aria-hidden="true"
-      role="dialog"
-      aria-modal="true"
     ></dialog>
 
     <script type="module" src="/assets/main.js"></script>

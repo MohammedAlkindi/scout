@@ -63,7 +63,7 @@ export function createSession() {
         location: { lat: 0, lng: 0, label: "Location pending" },
         intent: "",
         results: null,
-        name: "New Scout",
+        name: "New scout",
     };
 }
 export function createDemoSession() {

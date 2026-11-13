@@ -2,10 +2,17 @@ import { fetchRecommendation } from "./api.js";
 import { clearShareParamFromUrl, readSharedRecommendationFromUrl, } from "./share.js";
 import { applySettings, initSettingsPanel } from "./settings.js";
 import { createSession, createDemoSession, DEMO_SESSION_NAME, deleteSession, duplicateSession, loadSessions, loadSettings, saveSettings, saveSessions, upsertSession, } from "./storage.js";
+import { placeKey, readFieldPlan, renderFieldPlan } from "./views/fieldPlan.js";
 import { renderIntentInput } from "./views/intentInput.js";
 import { renderLocationGrant } from "./views/locationGrant.js";
-import { renderResults } from "./views/results.js";
+import { buildStaleNotice, renderResults } from "./views/results.js";
 const LOCATION_PENDING_LABEL = "Location pending";
+const STEPS = [
+    { id: "location", label: "Location" },
+    { id: "brief", label: "Brief" },
+    { id: "shortlist", label: "Shortlist" },
+    { id: "plan", label: "Plan" },
+];
 function closeNavigation() {
     const dialog = document.getElementById("mobile-nav");
     if (dialog?.open)
@@ -24,12 +31,10 @@ function getElements() {
         sidebarToggle: requireElement("sidebar-toggle", HTMLButtonElement),
         sessionList: requireElement("session-list", HTMLElement),
         newSession: requireElement("new-session", HTMLButtonElement),
-        navSessions: requireElement("nav-sessions", HTMLButtonElement),
-        navConditions: requireElement("nav-conditions", HTMLButtonElement),
-        navPreferences: requireElement("nav-preferences", HTMLButtonElement),
         sessionSearch: requireElement("session-search", HTMLInputElement),
         mainContent: requireElement("main-content", HTMLElement),
         activeTitle: requireElement("active-session-title", HTMLElement),
+        steps: requireElement("steps", HTMLElement),
         settingsPanel: requireElement("settings-panel", HTMLElement),
         settingsOverlay: requireElement("settings-overlay", HTMLElement),
         settingsOpen: requireElement("settings-open", HTMLButtonElement),
@@ -90,22 +95,62 @@ function openDemoSession(state) {
     state.activeSessionId = demo.id;
     saveSessions(state.sessions);
 }
-function setActiveNav(elements, state, activeNav) {
-    state.activeNav = activeNav;
-    elements.navSessions.classList.toggle("sidebar__nav-item--active", activeNav === "sessions");
-    elements.navConditions.classList.toggle("sidebar__nav-item--active", activeNav === "conditions");
-    elements.navPreferences.classList.toggle("sidebar__nav-item--active", activeNav === "preferences");
-    for (const [button, isActive] of [
-        [elements.navSessions, activeNav === "sessions"],
-        [elements.navConditions, activeNav === "conditions"],
-        [elements.navPreferences, activeNav === "preferences"],
-    ]) {
-        if (isActive) {
-            button.setAttribute("aria-current", "page");
+function chosenPlace(session) {
+    const key = session.fieldPlan?.placeKey;
+    if (!key || session.results === null)
+        return undefined;
+    return session.results.recommendations.find((item) => placeKey(item) === key);
+}
+function stepAvailable(session, step) {
+    switch (step) {
+        case "location":
+            return true;
+        case "brief":
+            return sessionHasLocation(session);
+        case "shortlist":
+            return session.results !== null;
+        case "plan":
+            return chosenPlace(session) !== undefined;
+    }
+}
+function furthestStep(session) {
+    if (chosenPlace(session) !== undefined)
+        return "plan";
+    if (session.results !== null)
+        return "shortlist";
+    if (sessionHasLocation(session))
+        return "brief";
+    return "location";
+}
+function currentStep(state, session) {
+    if (state.step !== null && stepAvailable(session, state.step)) {
+        return state.step;
+    }
+    return furthestStep(session);
+}
+function goTo(state, step) {
+    state.step = step;
+    state.focusHeading = true;
+}
+function renderSteps(elements, state, session, renderApp) {
+    const current = currentStep(state, session);
+    elements.steps.textContent = "";
+    for (const step of STEPS) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "steps__item";
+        button.textContent = step.label;
+        button.disabled = !stepAvailable(session, step.id);
+        if (step.id === current) {
+            button.setAttribute("aria-current", "step");
         }
-        else {
-            button.removeAttribute("aria-current");
-        }
+        button.addEventListener("click", () => {
+            if (currentStep(state, activeSession(state)) === step.id)
+                return;
+            goTo(state, step.id);
+            renderApp();
+        });
+        elements.steps.appendChild(button);
     }
 }
 function createMenuButton(label, onClick) {
@@ -117,6 +162,33 @@ function createMenuButton(label, onClick) {
         onClick();
     });
     return item;
+}
+function dotsIcon() {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 16 16");
+    svg.setAttribute("width", "16");
+    svg.setAttribute("height", "16");
+    svg.setAttribute("aria-hidden", "true");
+    for (const cx of [3, 8, 13]) {
+        const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        dot.setAttribute("cx", String(cx));
+        dot.setAttribute("cy", "8");
+        dot.setAttribute("r", "1.5");
+        dot.setAttribute("fill", "currentColor");
+        svg.appendChild(dot);
+    }
+    return svg;
+}
+function closeSessionMenus(except) {
+    for (const popover of Array.from(document.querySelectorAll(".menu-popover"))) {
+        if (popover !== except)
+            popover.hidden = true;
+    }
+    for (const trigger of Array.from(document.querySelectorAll(".session-menu__trigger"))) {
+        if (trigger.nextElementSibling !== except) {
+            trigger.setAttribute("aria-expanded", "false");
+        }
+    }
 }
 function renderSidebar(elements, state, renderApp) {
     elements.sessionList.textContent = "";
@@ -132,7 +204,7 @@ function renderSidebar(elements, state, renderApp) {
         row.className = `session-button${session.id === state.activeSessionId ? " session-button--active" : ""}`;
         const activate = () => {
             state.activeSessionId = session.id;
-            setActiveNav(elements, state, "sessions");
+            goTo(state, null);
             closeNavigation();
             renderApp();
         };
@@ -143,36 +215,46 @@ function renderSidebar(elements, state, renderApp) {
         if (session.id === state.activeSessionId) {
             selector.setAttribute("aria-current", "true");
         }
-        const text = document.createElement("span");
-        text.className = "session-button__text";
         const title = document.createElement("span");
         title.className = "session-button__title";
         title.textContent = session.name;
         const meta = document.createElement("span");
         meta.className = "session-button__meta";
-        const activity = session.intent.trim() || "No activity yet";
-        meta.textContent = `${session.location.label} / ${activity} / ${formatSessionTime(session.createdAt)}`;
-        text.append(title, meta);
+        meta.textContent = `${session.location.label}, ${formatSessionTime(session.createdAt)}`;
+        selector.append(title, meta);
         const menu = document.createElement("span");
         menu.className = "session-menu";
         const trigger = document.createElement("button");
-        trigger.className = "icon-button";
+        trigger.className = "icon-button session-menu__trigger";
         trigger.type = "button";
-        trigger.textContent = "...";
+        trigger.appendChild(dotsIcon());
         trigger.setAttribute("aria-label", `Session actions for ${session.name}`);
+        trigger.setAttribute("aria-haspopup", "menu");
+        trigger.setAttribute("aria-expanded", "false");
         const popover = document.createElement("span");
         popover.className = "menu-popover";
+        popover.setAttribute("role", "menu");
         popover.hidden = true;
         trigger.addEventListener("click", (event) => {
             event.stopPropagation();
-            popover.hidden = !popover.hidden;
+            const open = popover.hidden;
+            closeSessionMenus(popover);
+            popover.hidden = !open;
+            trigger.setAttribute("aria-expanded", String(open));
         });
         popover.append(createMenuButton("Rename", () => {
-            const nextName = window.prompt("Rename scout session", session.name);
+            const nextName = window.prompt("Rename this scout", session.name);
             if (nextName !== null && nextName.trim()) {
                 updateSession(state, { ...session, name: nextName.trim() });
                 renderApp();
             }
+        }), createMenuButton("Duplicate", () => {
+            const duplicate = duplicateSession(session);
+            state.sessions = [duplicate, ...state.sessions];
+            saveSessions(state.sessions);
+            state.activeSessionId = duplicate.id;
+            goTo(state, null);
+            renderApp();
         }), createMenuButton("Delete", () => {
             if (!window.confirm(`Delete “${session.name}” from this device?`))
                 return;
@@ -183,15 +265,12 @@ function renderSidebar(elements, state, renderApp) {
                 saveSessions(state.sessions);
             }
             state.activeSessionId = state.sessions[0]?.id ?? createSession().id;
-            renderApp();
-        }), createMenuButton("Duplicate", () => {
-            const duplicate = duplicateSession(session);
-            state.sessions = [duplicate, ...state.sessions];
-            saveSessions(state.sessions);
-            state.activeSessionId = duplicate.id;
+            goTo(state, null);
             renderApp();
         }));
-        selector.appendChild(text);
+        for (const item of Array.from(popover.children)) {
+            item.setAttribute("role", "menuitem");
+        }
         menu.append(trigger, popover);
         row.append(selector, menu);
         elements.sessionList.appendChild(row);
@@ -203,27 +282,62 @@ function renderSidebar(elements, state, renderApp) {
         elements.sessionList.appendChild(empty);
     }
 }
+function planPlace(state, item, renderApp) {
+    const session = activeSession(state);
+    const previous = readFieldPlan(session.fieldPlan);
+    const key = placeKey(item);
+    const plan = {
+        placeKey: key,
+        notes: previous.notes,
+        checks: previous.placeKey === key ? previous.checks : [],
+    };
+    state.planSaveFailed = false;
+    try {
+        updateSession(state, { ...session, fieldPlan: plan });
+    }
+    catch {
+        // Storage is full or blocked: keep the plan in memory so the view still works.
+        state.planSaveFailed = true;
+        state.sessions = state.sessions.map((candidate) => candidate.id === session.id ? { ...candidate, fieldPlan: plan } : candidate);
+    }
+    goTo(state, "plan");
+    renderApp();
+}
+function renderPlanView(wrapper, state, session, item, response, onRefresh) {
+    const stale = buildStaleNotice(response, onRefresh);
+    if (stale !== null)
+        wrapper.appendChild(stale);
+    const section = document.createElement("section");
+    renderFieldPlan(section, item, response, state.settings, readFieldPlan(session.fieldPlan), (next) => {
+        const current = activeSession(state);
+        updateSession(state, { ...current, fieldPlan: next });
+    });
+    wrapper.appendChild(section);
+    if (state.planSaveFailed) {
+        const status = section.querySelector("[role=status]");
+        if (status !== null) {
+            status.textContent =
+                "Couldn’t save locally. Download your brief to keep a copy.";
+        }
+    }
+}
 function renderActiveSession(elements, state, renderApp) {
     const session = activeSession(state);
-    elements.activeTitle.textContent =
-        state.activeNav === "conditions"
-            ? "Conditions"
-            : state.activeNav === "preferences"
-                ? "Preferences"
-                : session.name;
+    const step = currentStep(state, session);
+    elements.activeTitle.textContent = session.name;
+    renderSteps(elements, state, session, renderApp);
     elements.mainContent.textContent = "";
     const wrapper = document.createElement("div");
-    wrapper.className = "session-main";
+    wrapper.className = `view view--${step}`;
     elements.mainContent.appendChild(wrapper);
-    if (state.activeNav === "conditions") {
-        renderConditionsView(wrapper, session);
-        return;
-    }
-    if (state.activeNav === "preferences") {
-        renderPreferencesView(wrapper, state.settings);
-        return;
-    }
-    if (!sessionHasLocation(session)) {
+    const onRefresh = () => {
+        goTo(state, "brief");
+        renderApp();
+        elements.mainContent
+            .querySelector(".composer")
+            ?.requestSubmit();
+    };
+    if (step === "location") {
         renderLocationGrant(wrapper, {
             onGranted: (location) => {
                 const nextLocation = {
@@ -232,135 +346,86 @@ function renderActiveSession(elements, state, renderApp) {
                     label: location.label ??
                         `${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}`,
                 };
+                const current = activeSession(state);
+                const moved = !sessionHasLocation(current) ||
+                    current.location.lat !== nextLocation.lat ||
+                    current.location.lng !== nextLocation.lng;
                 updateSession(state, {
-                    ...session,
+                    ...current,
                     location: nextLocation,
-                    name: defaultSessionName(nextLocation, session.intent),
+                    name: defaultSessionName(nextLocation, current.intent),
+                    results: moved ? null : current.results,
+                    fieldPlan: moved ? undefined : current.fieldPlan,
                 });
+                goTo(state, "brief");
                 renderApp();
             },
         });
-        return;
     }
-    renderIntentInput(wrapper, session, state.settings, {
-        onSubmit: async (intent, shotType, radiusMiles, travelStyle) => {
-            const request = {
-                latitude: session.location.lat,
-                longitude: session.location.lng,
-                intent,
-                radius_miles: radiusMiles,
-                travel_style: travelStyle,
-            };
-            if (shotType !== undefined) {
-                request.shot_type = shotType;
-            }
-            const response = await fetchRecommendation(request);
-            const current = state.sessions.find((candidate) => candidate.id === session.id) ??
-                session;
-            const nextSession = {
-                ...current,
-                intent,
-                results: response,
-                searchRadiusMiles: radiusMiles,
-                travelStyle,
-                fieldPlan: current.fieldPlan
-                    ? { ...current.fieldPlan, placeKey: "", checks: [] }
-                    : undefined,
-                name: defaultSessionName(session.location, intent),
-            };
-            state.sessions = upsertSession(nextSession);
-            if (state.activeSessionId !== session.id)
-                return;
-            renderApp();
-            elements.mainContent.scrollTop = 0;
-            elements.mainContent
-                .querySelector(".results-heading h1")
-                ?.focus({ preventScroll: true });
-        },
-        onChangeLocation: () => {
-            const current = state.sessions.find((candidate) => candidate.id === session.id) ??
-                session;
-            updateSession(state, {
-                ...current,
-                location: { ...session.location, label: LOCATION_PENDING_LABEL },
-                results: null,
-            });
-            renderApp();
-        },
-        onUseDemo: () => {
-            openDemoSession(state);
-            setActiveNav(elements, state, "sessions");
-            renderApp();
-        },
-    });
-    if (session.results !== null) {
-        renderResults(wrapper, session.results, state.settings, session.fieldPlan, (fieldPlan) => {
-            const current = activeSession(state);
-            updateSession(state, { ...current, fieldPlan });
-        }, () => wrapper.querySelector(".composer")?.requestSubmit());
+    else if (step === "brief" || session.results === null) {
+        renderIntentInput(wrapper, session, state.settings, {
+            onSubmit: async (intent, shotType, radiusMiles, travelStyle, activityLabel) => {
+                const request = {
+                    latitude: session.location.lat,
+                    longitude: session.location.lng,
+                    intent,
+                    radius_miles: radiusMiles,
+                    travel_style: travelStyle,
+                };
+                if (shotType !== undefined) {
+                    request.shot_type = shotType;
+                }
+                const response = await fetchRecommendation(request);
+                const current = state.sessions.find((candidate) => candidate.id === session.id) ??
+                    session;
+                const nextSession = {
+                    ...current,
+                    intent,
+                    results: response,
+                    searchRadiusMiles: radiusMiles,
+                    travelStyle,
+                    fieldPlan: current.fieldPlan
+                        ? { ...current.fieldPlan, placeKey: "", checks: [] }
+                        : undefined,
+                    name: activityLabel,
+                };
+                state.sessions = upsertSession(nextSession);
+                if (state.activeSessionId !== session.id)
+                    return;
+                goTo(state, "shortlist");
+                renderApp();
+            },
+            onChangeLocation: () => {
+                goTo(state, "location");
+                renderApp();
+            },
+            onUseDemo: () => {
+                openDemoSession(state);
+                goTo(state, null);
+                renderApp();
+            },
+        });
     }
-}
-function renderConditionsView(root, session) {
-    const panel = document.createElement("section");
-    panel.className = "workspace-panel";
-    const title = document.createElement("h1");
-    title.textContent = "Condition intelligence";
-    const body = document.createElement("p");
-    body.textContent =
-        session.results === null
-            ? "Run a scout to see weather, timing, and light-condition summaries for each recommended place."
-            : "Review the current condition signals Scout used to rank this session.";
-    panel.append(title, body);
-    if (session.results !== null) {
-        const grid = document.createElement("div");
-        grid.className = "insight-grid";
-        for (const item of session.results.recommendations) {
-            const card = document.createElement("article");
-            card.className = `insight-card insight-card--${item.light_phase}`;
-            const cardTitle = document.createElement("h2");
-            cardTitle.textContent = item.location_name;
-            const score = document.createElement("p");
-            score.className = "data";
-            score.textContent = `${item.score}/100`;
-            const summary = document.createElement("p");
-            summary.textContent = item.conditions_summary;
-            card.append(cardTitle, score, summary);
-            grid.appendChild(card);
+    else if (step === "shortlist") {
+        renderResults(wrapper, session.results, state.settings, session.fieldPlan?.placeKey ?? "", {
+            onPlan: (item) => planPlace(state, item, renderApp),
+            onRefresh,
+        });
+    }
+    else {
+        const item = chosenPlace(session);
+        if (item === undefined) {
+            goTo(state, "shortlist");
+            renderApp();
+            return;
         }
-        panel.appendChild(grid);
+        renderPlanView(wrapper, state, session, item, session.results, onRefresh);
     }
-    root.appendChild(panel);
-}
-function renderPreferencesView(root, settings) {
-    const panel = document.createElement("section");
-    panel.className = "workspace-panel";
-    const title = document.createElement("h1");
-    title.textContent = "Preferences";
-    const body = document.createElement("p");
-    body.textContent =
-        "Use the settings drawer from the bottom-left Scout profile to adjust defaults.";
-    const grid = document.createElement("div");
-    grid.className = "insight-grid";
-    const rows = [
-        ["Units", settings.units],
-        ["Radius", `${settings.radiusMiles} mi`],
-        ["Time", settings.timeFormat],
-        ["Theme", settings.theme],
-        ["Activities", settings.activityTypes.join(", ") || "none"],
-    ];
-    for (const [label, value] of rows) {
-        const card = document.createElement("article");
-        card.className = "insight-card";
-        const cardTitle = document.createElement("h2");
-        cardTitle.textContent = label;
-        const cardValue = document.createElement("p");
-        cardValue.className = "data";
-        cardValue.textContent = value;
-        card.append(cardTitle, cardValue);
-        grid.appendChild(card);
+    if (state.focusHeading) {
+        state.focusHeading = false;
+        elements.mainContent.scrollTop = 0;
+        wrapper.querySelector("h1")?.focus({ preventScroll: true });
     }
-    panel.append(title, body, grid);
-    root.appendChild(panel);
 }
 function sharedSessionFromResponse(response) {
     const name = response.intent.trim()
@@ -404,11 +469,12 @@ function main() {
             ? firstSession.id
             : (initialSessions[0]?.id ?? firstSession.id),
         settings: loadSettings(),
-        activeNav: "sessions",
+        step: null,
         sessionQuery: "",
+        focusHeading: false,
+        planSaveFailed: false,
     };
     const renderApp = () => {
-        setActiveNav(elements, state, state.activeNav);
         renderSidebar(elements, state, renderApp);
         renderActiveSession(elements, state, renderApp);
     };
@@ -416,29 +482,15 @@ function main() {
         const existingDraft = state.sessions.find(isUntouchedDraft);
         if (existingDraft !== undefined) {
             state.activeSessionId = existingDraft.id;
-            setActiveNav(elements, state, "sessions");
-            closeNavigation();
-            renderApp();
-            return;
         }
-        const session = createSession();
-        state.sessions = [session, ...state.sessions];
-        state.activeSessionId = session.id;
-        setActiveNav(elements, state, "sessions");
-        saveSessions(state.sessions);
-        renderApp();
-    });
-    elements.navSessions.addEventListener("click", () => {
-        setActiveNav(elements, state, "sessions");
-        renderApp();
-    });
-    elements.navConditions.addEventListener("click", () => {
-        setActiveNav(elements, state, "conditions");
-        renderApp();
-    });
-    elements.navPreferences.addEventListener("click", () => {
-        setActiveNav(elements, state, "preferences");
-        elements.settingsOpen.click();
+        else {
+            const session = createSession();
+            state.sessions = [session, ...state.sessions];
+            state.activeSessionId = session.id;
+            saveSessions(state.sessions);
+        }
+        goTo(state, null);
+        closeNavigation();
         renderApp();
     });
     const mobileNav = requireElement("mobile-nav", HTMLDialogElement);
@@ -463,9 +515,10 @@ function main() {
             closeNavigation();
     });
     requireElement("nav-close", HTMLButtonElement).addEventListener("click", closeNavigation);
-    elements.sidebar.addEventListener("click", (event) => {
-        if (event.target.closest(".sidebar__nav-item, #new-session, #settings-open"))
-            closeNavigation();
+    document.addEventListener("click", () => closeSessionMenus());
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape")
+            closeSessionMenus();
     });
     elements.sessionSearch.addEventListener("input", () => {
         state.sessionQuery = elements.sessionSearch.value;
@@ -485,9 +538,9 @@ function main() {
         },
     });
     renderApp();
-    if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/sw.js').catch(() => { });
+    if ("serviceWorker" in navigator && window.location.protocol.startsWith("http")) {
+        window.addEventListener("load", () => {
+            navigator.serviceWorker.register("/sw.js").catch(() => { });
         });
     }
 }

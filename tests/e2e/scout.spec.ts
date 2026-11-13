@@ -109,8 +109,8 @@ test("does not create duplicate untouched sessions from repeated New Scout click
 
   await expect(sessionRows).toHaveCount(2);
   await expect(
-    page.getByText("Location pending / No activity yet"),
-  ).toBeVisible();
+    sessionRows.filter({ hasText: "Location pending" }),
+  ).toHaveCount(1);
 });
 
 test("selects destination anchors for city, country, and place scouting", async ({
@@ -150,8 +150,8 @@ test("selects destination anchors for city, country, and place scouting", async 
     .getByRole("button", { name: "Dubai, United Arab Emirates" })
     .click();
   await expect(
-    page.getByText("Dubai, United Arab Emirates / 25.2048, 55.2708"),
-  ).toBeVisible();
+    page.getByRole("button", { name: "Dubai, United Arab Emirates City" }),
+  ).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Scout Dubai" }).click();
 
   await expect(page.locator("#active-session-title")).toHaveText(
@@ -168,7 +168,7 @@ test("selects destination anchors for city, country, and place scouting", async 
     .click();
 
   await expect(
-    page.getByRole("heading", { name: "Your nearby shortlist" }),
+    page.getByRole("heading", { name: "Compare your shortlist" }),
   ).toBeVisible();
 });
 
@@ -211,7 +211,7 @@ test("sets a manual location and renders map-first recommendations", async ({
     .click();
 
   await expect(
-    page.getByRole("heading", { name: "Your nearby shortlist" }),
+    page.getByRole("heading", { name: "Compare your shortlist" }),
   ).toBeVisible();
   await expect(
     page.getByRole("link", { name: "Azaiba Beach Park, rank 1" }),
@@ -303,7 +303,7 @@ test("shows recovery actions when live scout fails", async ({ page }) => {
   await page.getByRole("button", { name: "Open Muscat demo" }).click();
 
   await expect(
-    page.getByRole("heading", { name: "Your nearby shortlist" }),
+    page.getByRole("heading", { name: "Compare your shortlist" }),
   ).toBeVisible();
   await expect(
     page
@@ -344,22 +344,17 @@ test("persists settings changes and applies them to recommendation units and tim
     page.getByRole("button", { name: "Open settings" }),
   ).toBeFocused();
 
-  await page.getByRole("button", { name: "Preferences" }).click();
+  await page.getByRole("button", { name: "Open settings" }).click();
   await expect(
-    page
-      .locator(".insight-card")
-      .filter({ hasText: "Units" })
-      .getByText("metric"),
-  ).toBeVisible();
+    settingsPanel.getByRole("button", { name: "metric" }),
+  ).toHaveAttribute("aria-pressed", "true");
   await expect(
-    page.locator(".insight-card").filter({ hasText: "Time" }).getByText("24h"),
-  ).toBeVisible();
+    settingsPanel.getByRole("button", { name: "24h" }),
+  ).toHaveAttribute("aria-pressed", "true");
   await expect(
-    page
-      .locator(".insight-card")
-      .filter({ hasText: "Theme" })
-      .getByText("dark"),
-  ).toBeVisible();
+    settingsPanel.getByRole("button", { name: "dark" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await settingsPanel.getByRole("button", { name: "Close settings" }).click();
 
   await page.reload({ waitUntil: "domcontentloaded" });
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
@@ -378,7 +373,7 @@ test("persists settings changes and applies them to recommendation units and tim
     .getByRole("button", { name: "Scout", exact: true })
     .click();
 
-  await expect(page.locator(".route-list").getByText("6.0 km")).toBeVisible();
+  await expect(page.locator("#recommendation-1")).toContainText("6.0 km");
   await expect(page.locator("#recommendation-1")).toContainText(
     /\d{2}:\d{2} - \d{2}:\d{2}/,
   );
@@ -448,7 +443,7 @@ test("keeps the main scouting flow usable on mobile", async ({ page }) => {
     .click();
 
   await expect(
-    page.getByRole("heading", { name: "Your nearby shortlist" }),
+    page.getByRole("heading", { name: "Compare your shortlist" }),
   ).toBeVisible();
   await expect(
     page
@@ -490,7 +485,7 @@ test("turns a choice into a persistent field plan and usable exports", async ({
   await page
     .getByRole("button", { name: "Plan Azaiba Beach Park", exact: true })
     .click();
-  await expect(page.locator("#field-plan h2")).toBeFocused();
+  await expect(page.locator("#field-plan h1")).toBeFocused();
   await page
     .getByLabel("Shoot notes")
     .fill("Bring 35mm lens; check water, light.");
@@ -529,6 +524,7 @@ test("turns a choice into a persistent field plan and usable exports", async ({
   const text = await readFile((await brief.path())!, "utf8");
   expect(text).toContain("- [x] Confirm access");
   expect(text).toContain("Bring 35mm lens");
+  await page.getByRole("button", { name: "Shortlist", exact: true }).click();
   const href = await page
     .getByRole("link", { name: "Open share link" })
     .getAttribute("href");
@@ -552,16 +548,17 @@ test("changing a planned place resets location checks and keeps shoot notes", as
     ],
   });
   await page
-    .getByRole("button", { name: "Choose Azaiba Beach Park", exact: true })
+    .getByRole("button", { name: "Plan Azaiba Beach Park", exact: true })
     .click();
   await page.getByLabel("Shoot notes").fill("Portrait series");
   await page
     .getByLabel("Check the actual route, parking and travel time")
     .check();
+  await page.getByRole("button", { name: "Shortlist", exact: true }).click();
   await page
-    .getByRole("button", { name: "Choose Backup park", exact: true })
+    .getByRole("button", { name: "Plan Backup park", exact: true })
     .click();
-  await expect(page.locator("#field-plan h3")).toHaveText("Backup park");
+  await expect(page.locator("#field-plan h1")).toHaveText("Backup park");
   await expect(
     page.getByLabel("Check the actual route, parking and travel time"),
   ).not.toBeChecked();
@@ -598,7 +595,7 @@ test("live destination lookup supports origins beyond the built-in list", async 
   await expect(page.locator("#active-session-title")).toHaveText(
     "Tampa, Florida, United States",
   );
-  await expect(page.getByLabel("Location", { exact: true })).toHaveValue(
+  await expect(page.locator(".composer__origin")).toContainText(
     "Tampa, Florida, United States",
   );
 });
@@ -617,7 +614,7 @@ test("mobile navigation and settings trap focus and close with Escape", async ({
     page.getByRole("button", { name: "Open sessions" }),
   ).toBeFocused();
   await page.getByRole("button", { name: "Open sessions" }).click();
-  await page.getByRole("button", { name: "Preferences", exact: true }).click();
+  await page.getByRole("button", { name: "Open settings" }).click();
   await expect(page.getByRole("dialog", { name: "Settings" })).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Close settings" }),
@@ -699,7 +696,7 @@ test("editing priorities refreshes the search without losing shoot notes", async
     .click();
   await page.getByLabel("Shoot notes").fill("Keep this composition idea");
   await page.getByLabel("Recheck weather before leaving").check();
-  await page.locator(".edit-search > summary").click();
+  await page.getByRole("button", { name: "Brief", exact: true }).click();
   await page.getByLabel("Search radius (mi)").fill("5");
   await page.getByLabel("Prioritize").selectOption("family");
   await page
@@ -707,8 +704,8 @@ test("editing priorities refreshes the search without losing shoot notes", async
     .getByRole("button", { name: "Scout", exact: true })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Choose a place to make it yours." }),
-  ).toBeVisible();
+    page.getByRole("button", { name: "Plan", exact: true }),
+  ).toBeDisabled();
   await page
     .getByRole("button", { name: "Plan Azaiba Beach Park", exact: true })
     .click();

@@ -150,6 +150,9 @@ const DESTINATIONS: ReadonlyArray<DestinationOption> = [
   },
 ];
 
+/** Keep the grid to two rows at most so nothing scrolls inside the view. */
+const MAX_VISIBLE_DESTINATIONS = 8;
+
 function describeGeolocationError(error: GeolocationPositionError): string {
   switch (error.code) {
     case error.PERMISSION_DENIED:
@@ -212,36 +215,33 @@ function destinationMatchRank(
   return 3;
 }
 
+function field(
+  labelText: string,
+  input: HTMLInputElement,
+): HTMLLabelElement {
+  const label = document.createElement("label");
+  label.className = "field";
+  const text = document.createElement("span");
+  text.className = "field__label";
+  text.textContent = labelText;
+  label.append(text, input);
+  return label;
+}
+
 export function renderLocationGrant(
   root: HTMLElement,
   handlers: LocationGrantHandlers,
 ): void {
-  const section = document.createElement("section");
-  section.className = "location-state";
-
-  const intro = document.createElement("div");
-  intro.className = "location-state__intro";
-
+  const header = document.createElement("header");
+  header.className = "view-header";
   const title = document.createElement("h1");
-  title.textContent = "Plan an outing";
-
-  const body = document.createElement("p");
-  body.textContent =
-    "Choose a starting location to compare nearby places, light and weather.";
-
-  intro.append(title, body);
-
-  const panel = document.createElement("div");
-  panel.className = "location-panel";
-
-  const panelHeader = document.createElement("div");
-  panelHeader.className = "location-panel__header";
-  const panelTitle = document.createElement("h2");
-  panelTitle.textContent = "Starting location";
-  const panelCopy = document.createElement("p");
-  panelCopy.textContent =
-    "Search a destination, use your location or enter coordinates.";
-  panelHeader.append(panelTitle, panelCopy);
+  title.textContent = "Starting location";
+  title.tabIndex = -1;
+  const lede = document.createElement("p");
+  lede.className = "lede";
+  lede.textContent =
+    "Search a destination or use your position. Scout compares the places nearby against light and weather.";
+  header.append(title, lede);
 
   let selectedDestination: DestinationOption = DESTINATIONS[0] ?? {
     kind: "City",
@@ -254,30 +254,31 @@ export function renderLocationGrant(
     featured: true,
   };
 
-  const destinationPicker = document.createElement("div");
-  destinationPicker.className = "destination-picker";
-  const destinationField = document.createElement("label");
-  destinationField.className = "field";
-  const destinationLabelText = document.createElement("span");
-  destinationLabelText.className = "label";
-  destinationLabelText.textContent = "Destination";
+  const picker = document.createElement("div");
+  picker.className = "destination-picker";
   const destinationSearch = document.createElement("input");
   destinationSearch.className = "input destination-picker__search";
   destinationSearch.type = "search";
   destinationSearch.placeholder = "Search cities, countries, places";
   destinationSearch.autocomplete = "off";
-  destinationField.append(destinationLabelText, destinationSearch);
+  destinationSearch.setAttribute("aria-label", "Destination");
 
   const destinationGrid = document.createElement("div");
   destinationGrid.className = "destination-grid";
   destinationGrid.setAttribute("role", "list");
 
-  const destinationSummary = document.createElement("p");
-  destinationSummary.className = "destination-summary";
-
   const useDestination = document.createElement("button");
   useDestination.type = "button";
   useDestination.className = "button button--primary";
+
+  const locate = document.createElement("button");
+  locate.type = "button";
+  locate.className = "button";
+  locate.textContent = "Use my location";
+
+  const actions = document.createElement("div");
+  actions.className = "location-actions";
+  actions.append(useDestination, locate);
 
   let liveDestinations: DestinationOption[] = [];
   let liveQuery = "";
@@ -300,10 +301,12 @@ export function renderLocationGrant(
         : liveQuery === query
           ? liveDestinations
           : []
-    ).sort(
-      (left, right) =>
-        destinationMatchRank(left, query) - destinationMatchRank(right, query),
-    );
+    )
+      .sort(
+        (left, right) =>
+          destinationMatchRank(left, query) - destinationMatchRank(right, query),
+      )
+      .slice(0, MAX_VISIBLE_DESTINATIONS);
     if (query && !matches.includes(selectedDestination)) {
       selectedDestination = matches[0] ?? selectedDestination;
     }
@@ -324,19 +327,16 @@ export function renderLocationGrant(
         `${destinationLabel(destination)} ${destination.kind}`,
       );
 
-      const kind = document.createElement("span");
-      kind.className = "destination-card__kind";
-      kind.textContent = destination.kind;
       const name = document.createElement("span");
       name.className = "destination-card__name";
       name.textContent = destination.name;
-      const meta = document.createElement("span");
-      meta.className = "destination-card__meta";
-      meta.textContent = destination.region;
+      const region = document.createElement("span");
+      region.className = "destination-card__region";
+      region.textContent = destination.region;
       const description = document.createElement("span");
       description.className = "destination-card__description";
       description.textContent = destination.description;
-      option.append(kind, name, meta, description);
+      option.append(name, region, description);
       option.addEventListener("click", () => selectDestination(destination));
       destinationGrid.appendChild(option);
     }
@@ -354,12 +354,6 @@ export function renderLocationGrant(
     }
 
     useDestination.disabled = matches.length === 0;
-    destinationSummary.textContent =
-      matches.length === 0
-        ? "Choose a result before continuing."
-        : `${destinationLabel(selectedDestination)} / ${selectedDestination.latitude.toFixed(
-            4,
-          )}, ${selectedDestination.longitude.toFixed(4)}`;
     useDestination.textContent = `Scout ${selectedDestination.name}`;
   }
 
@@ -414,74 +408,48 @@ export function renderLocationGrant(
       label: destinationLabel(selectedDestination),
     });
   });
-  destinationPicker.append(
-    destinationField,
-    destinationGrid,
-    destinationSummary,
-    useDestination,
-  );
+  picker.append(destinationSearch, destinationGrid);
   renderDestinations();
 
-  const quickActions = document.createElement("div");
-  quickActions.className = "location-quick-actions";
+  const status = document.createElement("p");
+  status.className = "status";
+  status.setAttribute("role", "status");
 
-  const locate = document.createElement("button");
-  locate.type = "button";
-  locate.className = "button";
-  locate.textContent = "Use my location";
-  quickActions.appendChild(locate);
+  const coordinates = document.createElement("form");
+  coordinates.className = "coordinate-form";
+  coordinates.noValidate = true;
+  coordinates.setAttribute("aria-label", "Exact coordinates");
 
-  const divider = document.createElement("div");
-  divider.className = "form-divider";
-  divider.textContent = "Exact coordinate";
+  const coordinateTitle = document.createElement("p");
+  coordinateTitle.className = "coordinate-form__title";
+  coordinateTitle.textContent = "Or enter exact coordinates";
 
-  const actions = document.createElement("form");
-  actions.className = "location-actions";
-  actions.noValidate = true;
-
-  const latField = document.createElement("label");
-  latField.className = "field";
-  const latLabel = document.createElement("span");
-  latLabel.className = "label";
-  latLabel.textContent = "Latitude";
   const latInput = document.createElement("input");
   latInput.className = "input data";
   latInput.inputMode = "decimal";
   latInput.placeholder = "37.7749";
-  latField.append(latLabel, latInput);
-
-  const lngField = document.createElement("label");
-  lngField.className = "field";
-  const lngLabel = document.createElement("span");
-  lngLabel.className = "label";
-  lngLabel.textContent = "Longitude";
+  latInput.autocomplete = "off";
   const lngInput = document.createElement("input");
   lngInput.className = "input data";
   lngInput.inputMode = "decimal";
   lngInput.placeholder = "-122.4194";
-  lngField.append(lngLabel, lngInput);
+  lngInput.autocomplete = "off";
 
   const manual = document.createElement("button");
   manual.type = "submit";
   manual.className = "button";
   manual.textContent = "Use coordinates";
 
-  actions.append(latField, lngField, manual);
-
-  const status = document.createElement("p");
-  status.className = "status";
-  status.setAttribute("role", "status");
-
-  panel.append(
-    panelHeader,
-    destinationPicker,
-    quickActions,
-    divider,
-    actions,
-    status,
+  const coordinateRow = document.createElement("div");
+  coordinateRow.className = "coordinate-form__row";
+  coordinateRow.append(
+    field("Latitude", latInput),
+    field("Longitude", lngInput),
+    manual,
   );
-  section.append(intro, panel);
-  root.appendChild(section);
+  coordinates.append(coordinateTitle, coordinateRow);
+
+  root.append(header, picker, actions, status, coordinates);
 
   if (!("geolocation" in navigator)) {
     locate.disabled = true;
@@ -493,7 +461,7 @@ export function renderLocationGrant(
   locate.addEventListener("click", () => {
     locate.disabled = true;
     status.className = "status";
-    status.textContent = "Reading browser location.";
+    status.textContent = "Reading browser location…";
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
@@ -512,7 +480,7 @@ export function renderLocationGrant(
     );
   });
 
-  actions.addEventListener("submit", (event) => {
+  coordinates.addEventListener("submit", (event) => {
     event.preventDefault();
     const latitude = parseCoordinate(latInput.value);
     const longitude = parseCoordinate(lngInput.value);

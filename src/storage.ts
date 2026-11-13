@@ -77,7 +77,7 @@ export function createSession(): Session {
     location: { lat: 0, lng: 0, label: "Location pending" },
     intent: "",
     results: null,
-    name: "New Scout",
+    name: "New scout",
   };
 }
 

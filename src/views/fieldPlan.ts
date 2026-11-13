@@ -119,14 +119,12 @@ export function renderFieldPlan(
   root.className = "field-plan";
   root.id = "field-plan";
   root.setAttribute("aria-label", "Your field plan");
-  const eyebrow = document.createElement("p");
-  eyebrow.className = "label";
-  eyebrow.textContent = "Field plan";
-  const heading = document.createElement("h2");
-  heading.textContent = "Your field plan";
-  heading.tabIndex = -1;
-  const name = document.createElement("h3");
+
+  const header = document.createElement("header");
+  header.className = "view-header";
+  const name = document.createElement("h1");
   name.textContent = item.location_name;
+  name.tabIndex = -1;
   const time = document.createElement("p");
   time.className = "plan-window";
   const format = new Intl.DateTimeFormat(undefined, {
@@ -137,10 +135,12 @@ export function renderFieldPlan(
     hour12: settings.timeFormat === "12h",
     timeZoneName: "short",
   });
-  time.textContent = `${format.format(new Date(item.best_window.start_utc))} – ${format.format(new Date(item.best_window.end_utc))}`;
+  time.textContent = `${format.format(new Date(item.best_window.start_utc))} - ${format.format(new Date(item.best_window.end_utc))}`;
   const context = document.createElement("p");
-  context.className = "muted";
-  context.textContent = `${item.conditions_summary}. This is the light window; allow extra time to travel and set up.`;
+  context.className = "lede";
+  context.textContent = `${item.conditions_summary} This is the light window only; add time to travel and set up.`;
+  header.append(name, time, context);
+
   const actions = document.createElement("div");
   actions.className = "plan-actions";
   const directions = document.createElement("a");
@@ -179,9 +179,11 @@ export function renderFieldPlan(
     );
   });
   actions.append(directions, calendar, exportBrief);
+
   const grid = document.createElement("div");
   grid.className = "plan-grid";
   const checklist = document.createElement("fieldset");
+  checklist.className = "plan-checklist";
   const legend = document.createElement("legend");
   legend.textContent = "Before you go";
   checklist.append(legend);
@@ -219,32 +221,24 @@ export function renderFieldPlan(
   }
   const notesLabel = document.createElement("label");
   notesLabel.className = "field";
-  notesLabel.textContent = "Shoot notes";
+  const notesTitle = document.createElement("span");
+  notesTitle.className = "field__label";
+  notesTitle.textContent = "Shoot notes";
   const notes = document.createElement("textarea");
   notes.name = "shoot-notes";
   notes.maxLength = 2000;
-  notes.rows = 5;
+  notes.rows = 6;
   notes.placeholder = "Composition, gear or a backup idea…";
   notes.value = plan.notes;
   notes.addEventListener("input", () => {
     plan = { ...plan, notes: notes.value };
     save();
   });
-  notesLabel.append(notes);
+  notesLabel.append(notesTitle, notes);
   grid.append(checklist, notesLabel);
   const privacy = document.createElement("p");
   privacy.className = "muted small";
   privacy.textContent =
-    "Notes stay with this scout on this device. They are excluded from shared result links; downloads include them. Choosing another place resets the checklist.";
-  root.append(
-    eyebrow,
-    heading,
-    name,
-    time,
-    context,
-    actions,
-    grid,
-    privacy,
-    status,
-  );
+    "Notes stay on this device and are left out of share links. Choosing another place resets the checklist.";
+  root.append(header, actions, grid, privacy, status);
 }

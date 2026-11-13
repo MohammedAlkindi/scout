@@ -46,7 +46,7 @@ function section(title) {
     const wrapper = document.createElement("section");
     wrapper.className = "settings-section";
     const heading = document.createElement("h2");
-    heading.className = "label";
+    heading.className = "settings-section__title";
     heading.textContent = title;
     wrapper.appendChild(heading);
     return wrapper;
@@ -73,7 +73,7 @@ export function initSettingsPanel(options) {
         title.id = "settings-title";
         title.textContent = "Settings";
         options.panel.setAttribute("aria-labelledby", title.id);
-        const close = button("x", "icon-button");
+        const close = button("×", "icon-button settings-panel__close");
         close.setAttribute("aria-label", "Close settings");
         close.addEventListener("click", () => closePanel());
         header.append(title, close);
