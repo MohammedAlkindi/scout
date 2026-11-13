@@ -198,6 +198,7 @@ export function renderIntentInput(root, session, settings, handlers) {
     radius.min = "1";
     radius.max = "50";
     radius.required = true;
+    radius.autocomplete = "off";
     radius.value = String(session.searchRadiusMiles ?? settings.radiusMiles);
     radiusField.append(radiusLabel, radius);
     const styleField = document.createElement("label");

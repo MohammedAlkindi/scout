@@ -854,7 +854,7 @@ textarea {
   gap: 24px;
 }
 
-.results-heading > div {
+.results-heading > div:first-child {
   display: grid;
   gap: 8px;
 }

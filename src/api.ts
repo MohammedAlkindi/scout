@@ -1,10 +1,10 @@
 /**
  * Typed fetch wrapper for the Scout backend.
  *
- * The frontend's three-view flow only ever calls one endpoint
+ * The frontend's step flow only ever calls one endpoint
  * (POST /api/recommendation) -- the other four MCP tools are exposed over
- * HTTP for completeness (see server/api.py) but nothing in this
- * text-first, single-screen-result UI needs them directly.
+ * HTTP for completeness (see server/api.py) but nothing in the
+ * location, brief, shortlist and plan views needs them directly.
  */
 
 import type { ApiErrorResponse, RecommendationRequest, RecommendationResponse } from "./types.js";
