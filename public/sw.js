@@ -1,5 +1,5 @@
 // Scout Service Worker for Offline Field Planning
-const CACHE_NAME = 'scout-v1';
+const CACHE_NAME = 'scout-v2';
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',
@@ -7,15 +7,17 @@ const PRECACHE_ASSETS = [
   '/logo.svg',
   '/manifest.json',
   '/fonts/dm-sans-latin.woff2',
+  '/fonts/dm-mono-400-latin.woff2',
   '/assets/main.js',
   '/assets/api.js',
+  '/assets/format.js',
   '/assets/settings.js',
   '/assets/share.js',
+  '/assets/storage.js',
   '/assets/types.js',
-  '/assets/views/conditions.js',
   '/assets/views/fieldPlan.js',
-  '/assets/views/intent.js',
-  '/assets/views/location.js',
+  '/assets/views/intentInput.js',
+  '/assets/views/locationGrant.js',
   '/assets/views/results.js'
 ];
 
